@@ -1,0 +1,8 @@
+# 策略管理服务
+string action          # 动作: CREATE, START, STOP, PAUSE, RESUME, DELETE
+string strategy_id     # 策略ID
+string strategy_config # 策略配置(JSON)
+---
+bool success           # 是否成功
+string message         # 消息
+string new_strategy_id # 新策略ID

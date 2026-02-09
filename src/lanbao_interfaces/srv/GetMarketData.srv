@@ -1,0 +1,9 @@
+# 获取市场数据服务
+string symbol          # 股票代码
+string start_date      # 开始日期
+string end_date        # 结束日期
+string freq            # 频率: daily, weekly, monthly
+---
+bool success           # 是否成功
+string message         # 消息
+MarketData[] data      # 数据

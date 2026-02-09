@@ -1,0 +1,17 @@
+# 回测策略动作
+# Goal
+string strategy_id     # 策略ID
+string symbol          # 股票代码
+string start_date      # 开始日期
+string end_date        # 结束日期
+float64 initial_capital  # 初始资金
+---
+# Feedback
+string status          # 状态
+float64 progress       # 进度 0.0-1.0
+string current_step    # 当前步骤
+---
+# Result
+bool success           # 是否成功
+BacktestResult result  # 回测结果
+string message         # 消息

@@ -1,0 +1,5 @@
+# 获取节点状态服务
+string node_name       # 节点名称(为空则获取所有)
+---
+bool success           # 是否成功
+NodeStatus[] statuses  # 状态列表

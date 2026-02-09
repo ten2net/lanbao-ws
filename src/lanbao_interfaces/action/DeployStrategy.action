@@ -1,0 +1,12 @@
+# 部署策略动作
+# Goal
+string strategy_id     # 策略ID
+string deploy_mode     # 部署模式: SIMULATION, LIVE
+---
+# Feedback
+string status          # 状态
+float64 progress       # 进度 0.0-1.0
+---
+# Result
+bool success           # 是否成功
+string message         # 消息

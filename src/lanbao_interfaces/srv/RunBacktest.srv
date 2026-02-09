@@ -1,0 +1,10 @@
+# 运行回测服务
+string strategy_id     # 策略ID
+string symbol          # 股票代码
+string start_date      # 开始日期
+string end_date        # 结束日期
+float64 initial_capital  # 初始资金
+---
+bool success           # 是否成功
+string backtest_id     # 回测ID
+string message         # 消息

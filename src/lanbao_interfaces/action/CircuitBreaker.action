@@ -1,0 +1,13 @@
+# 熔断动作
+# Goal
+string breaker_type    # 熔断类型: STRATEGY, SYSTEM, TRADING
+string target_id       # 目标ID
+string reason          # 熔断原因
+---
+# Feedback
+string status          # 状态
+int32 remaining_time   # 剩余时间(秒)
+---
+# Result
+bool success           # 是否成功
+string message         # 消息

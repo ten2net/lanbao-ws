@@ -1,0 +1,12 @@
+# 执行订单服务
+string symbol          # 股票代码
+string action          # 动作: BUY, SELL
+int32 quantity         # 数量
+float64 price          # 价格
+string order_type      # 订单类型
+string strategy_id     # 策略ID
+---
+bool success           # 是否成功
+string order_id        # 订单ID
+string message         # 消息
+float64 estimated_cost # 预估成本

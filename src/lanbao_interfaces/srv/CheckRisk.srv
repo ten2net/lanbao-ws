@@ -1,0 +1,7 @@
+# 风险检查服务
+TradeSignal signal     # 交易信号
+PortfolioStatus portfolio  # 当前持仓
+---
+bool approved          # 是否通过
+string reason          # 原因
+float64 risk_score     # 风险评分

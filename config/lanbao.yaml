@@ -1,0 +1,75 @@
+# 揽宝智能投研交易平台配置
+# MVP版本 V0.5
+
+# 系统配置
+system:
+  name: "揽宝智能投研交易平台"
+  version: "0.5.0"
+  environment: "development"  # development, staging, production
+  timezone: "Asia/Shanghai"
+
+# 日志配置
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "./logs/lanbao.log"
+  max_size: "100MB"
+  backup_count: 5
+
+# 数据配置
+data:
+  # DuckDB配置
+  duckdb:
+    path: "./data/lanbao.duckdb"
+  
+  # 数据源配置
+  sources:
+    tushare:
+      enabled: true
+      priority: 1
+      rate_limit: 100  # 每分钟请求数限制
+      timeout: 30
+    
+    akshare:
+      enabled: false
+      priority: 2
+      rate_limit: 200
+
+# 回测配置
+backtest:
+  default_initial_capital: 100000.0
+  commission_rate: 0.0003
+  slippage: 0.001
+  default_start_date: "20230101"
+  default_end_date: "20241231"
+
+# 风险控制配置
+risk:
+  max_position_size: 0.2
+  max_drawdown: 0.1
+  max_daily_loss: 0.05
+  max_concentration: 0.3
+  
+  # 熔断配置
+  circuit_breaker:
+    enabled: true
+    consecutive_losses: 5  # 连续亏损次数触发熔断
+    drawdown_threshold: 0.15  # 回撤阈值触发熔断
+
+# 节点配置
+nodes:
+  market_data_node:
+    publish_rate: 1.0
+    update_interval: 60  # 数据更新间隔(秒)
+    
+  backtest_engine_node:
+    max_concurrent_backtests: 5
+    default_initial_capital: 100000.0
+    
+  strategy_manager_node:
+    max_strategies: 20
+    
+  risk_control_node:
+    check_interval: 1  # 风险检查间隔(秒)
+    
+  monitor_node:
+    system_check_interval: 10  # 系统监控间隔(秒)

@@ -1,0 +1,146 @@
+# 揽宝智能投研交易平台 - Docker Compose配置
+# MVP版本 V0.5
+
+version: '3.8'
+
+services:
+  # 核心ROS2服务
+  lanbao-core:
+    build: .
+    image: lanbao:latest
+    container_name: lanbao-core
+    environment:
+      - ROS_DOMAIN_ID=0
+      - TUSHARE_TOKEN=${TUSHARE_TOKEN}
+      - LANBAO_LOG_LEVEL=INFO
+    volumes:
+      - ./data:/workspace/data
+      - ./logs:/workspace/logs
+      - ./config:/workspace/config
+    networks:
+      - lanbao-network
+    command: ros2 launch lanbao_core lanbao.launch.py
+
+  # 市场数据节点
+  market-data:
+    build: .
+    image: lanbao:latest
+    container_name: lanbao-market-data
+    environment:
+      - ROS_DOMAIN_ID=0
+      - TUSHARE_TOKEN=${TUSHARE_TOKEN}
+    volumes:
+      - ./data:/workspace/data
+      - ./logs:/workspace/logs
+    networks:
+      - lanbao-network
+    depends_on:
+      - lanbao-core
+    command: ros2 run lanbao_data market_data_node
+
+  # 回测引擎节点
+  backtest-engine:
+    build: .
+    image: lanbao:latest
+    container_name: lanbao-backtest
+    environment:
+      - ROS_DOMAIN_ID=0
+    volumes:
+      - ./data:/workspace/data
+      - ./logs:/workspace/logs
+    networks:
+      - lanbao-network
+    depends_on:
+      - lanbao-core
+      - market-data
+    command: ros2 run lanbao_backtest backtest_engine_node
+
+  # 策略管理节点
+  strategy-manager:
+    build: .
+    image: lanbao:latest
+    container_name: lanbao-strategy
+    environment:
+      - ROS_DOMAIN_ID=0
+    volumes:
+      - ./data:/workspace/data
+      - ./config:/workspace/config
+    networks:
+      - lanbao-network
+    depends_on:
+      - lanbao-core
+    command: ros2 run lanbao_strategy strategy_manager_node
+
+  # 风险控制节点
+  risk-control:
+    build: .
+    image: lanbao:latest
+    container_name: lanbao-risk
+    environment:
+      - ROS_DOMAIN_ID=0
+    networks:
+      - lanbao-network
+    depends_on:
+      - lanbao-core
+    command: ros2 run lanbao_risk risk_control_node
+
+  # 监控节点
+  monitor:
+    build: .
+    image: lanbao:latest
+    container_name: lanbao-monitor
+    environment:
+      - ROS_DOMAIN_ID=0
+    volumes:
+      - ./logs:/workspace/logs
+    networks:
+      - lanbao-network
+    depends_on:
+      - lanbao-core
+    command: ros2 run lanbao_monitor monitor_node
+
+  # Jupyter研究环境
+  jupyter:
+    build: .
+    image: lanbao:latest
+    container_name: lanbao-jupyter
+    environment:
+      - ROS_DOMAIN_ID=0
+      - TUSHARE_TOKEN=${TUSHARE_TOKEN}
+    volumes:
+      - ./data:/workspace/data
+      - ./notebooks:/workspace/notebooks
+      - ./config:/workspace/config
+      - ./src:/workspace/src
+    ports:
+      - "8888:8888"
+    networks:
+      - lanbao-network
+    command: jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token=''
+
+  # Web监控界面 (Streamlit)
+  web:
+    build: .
+    image: lanbao:latest
+    container_name: lanbao-web
+    environment:
+      - ROS_DOMAIN_ID=0
+    volumes:
+      - ./data:/workspace/data
+      - ./config:/workspace/config
+    ports:
+      - "8501:8501"
+    networks:
+      - lanbao-network
+    depends_on:
+      - lanbao-core
+      - monitor
+    command: streamlit run /workspace/src/lanbao_monitor/dashboard.py --server.port=8501 --server.address=0.0.0.0
+
+networks:
+  lanbao-network:
+    driver: bridge
+
+volumes:
+  lanbao-data:
+  lanbao-logs:

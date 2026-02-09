@@ -161,8 +161,13 @@ class PerformanceAnalyzer:
         if len(equity) == 0:
             return pd.Series()
         
-        # 按月重采样
-        monthly = equity.resample('M').last()
+        # 确保索引是 DatetimeIndex
+        if not isinstance(equity.index, pd.DatetimeIndex):
+            equity = equity.copy()
+            equity.index = pd.to_datetime(equity.index)
+        
+        # 按月重采样 (ME = Month End)
+        monthly = equity.resample('ME').last()
         monthly_returns = monthly.pct_change().dropna()
         
         return monthly_returns

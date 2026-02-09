@@ -12,6 +12,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/StockSignal.msg"
   "msg/TradeSignal.msg"
   "msg/OrderStatus.msg"
+  "msg/StockPosition.msg"
   "msg/PortfolioStatus.msg"
   "msg/RiskAlert.msg"
   "msg/BacktestResult.msg"

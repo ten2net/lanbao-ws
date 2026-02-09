@@ -26,14 +26,34 @@ fi
 # 创建日志目录
 mkdir -p logs
 
+# 基础PYTHONPATH (注意: lanbao_interfaces使用python3.11目录但包含python3.10的so文件)
+ROS_PYTHONPATH="/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages"
+LANBAO_PATHS="/home/ubuntu/lanbao_ws/install/lanbao_interfaces/lib/python3.11/site-packages:/home/ubuntu/lanbao_ws/install/lanbao_core/lib/python3.10/site-packages:/home/ubuntu/lanbao_ws/install/lanbao_data/lib/python3.10/site-packages:/home/ubuntu/lanbao_ws/install/lanbao_strategy/lib/python3.10/site-packages:/home/ubuntu/lanbao_ws/install/lanbao_backtest/lib/python3.10/site-packages:/home/ubuntu/lanbao_ws/install/lanbao_risk/lib/python3.10/site-packages:/home/ubuntu/lanbao_ws/install/lanbao_monitor/lib/python3.10/site-packages"
+
 # 启动函数
 start_node() {
     local node_name=$1
     local package=$2
-    local executable=$3
+    local module=$3
     
     echo -e "${BLUE}启动 $node_name...${NC}"
-    ros2 run $package $executable > "logs/${node_name}.log" 2>&1 &
+    
+    # 创建启动脚本
+    cat > "logs/${node_name}_launcher.sh" << EOF
+#!/bin/bash
+source /opt/ros/humble/setup.bash
+source /home/ubuntu/lanbao_ws/install/setup.bash
+export PYTHONPATH="${ROS_PYTHONPATH}:${LANBAO_PATHS}"
+export LD_LIBRARY_PATH=/home/ubuntu/lanbao_ws/install/lanbao_interfaces/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib:/usr/local/lib
+export PATH=/opt/ros/humble/bin:\$PATH
+cd /home/ubuntu/lanbao_ws
+/usr/bin/python3 -m ${module} 2>&1
+EOF
+    chmod +x "logs/${node_name}_launcher.sh"
+    
+    # 使用nohup启动
+    nohup "logs/${node_name}_launcher.sh" > "logs/${node_name}.log" 2>&1 &
+    
     echo $! > "logs/${node_name}.pid"
     echo -e "${GREEN}✓ $node_name 已启动 (PID: $!)${NC}"
 }
@@ -43,23 +63,23 @@ echo ""
 echo "正在启动节点..."
 
 # 1. 市场数据节点
-start_node "market_data" "lanbao_data" "market_data_node"
+start_node "market_data" "lanbao_data" "lanbao_data.market_data_node"
 sleep 2
 
 # 2. 回测引擎节点
-start_node "backtest" "lanbao_backtest" "backtest_engine_node"
+start_node "backtest" "lanbao_backtest" "lanbao_backtest.backtest_engine_node"
 sleep 1
 
 # 3. 策略管理节点
-start_node "strategy" "lanbao_strategy" "strategy_manager_node"
+start_node "strategy" "lanbao_strategy" "lanbao_strategy.strategy_manager_node"
 sleep 1
 
 # 4. 风险控制节点
-start_node "risk" "lanbao_risk" "risk_control_node"
+start_node "risk" "lanbao_risk" "lanbao_risk.risk_control_node"
 sleep 1
 
 # 5. 监控节点
-start_node "monitor" "lanbao_monitor" "monitor_node"
+start_node "monitor" "lanbao_monitor" "lanbao_monitor.monitor_node"
 
 echo ""
 echo -e "${GREEN}=======================================${NC}"

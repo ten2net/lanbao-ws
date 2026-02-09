@@ -149,7 +149,7 @@ def show_overview():
     with col1:
         st.subheader("CPU 使用率")
         cpu_data = pd.DataFrame({
-            '时间': pd.date_range(start='2024-01-01', periods=24, freq='H'),
+            '时间': pd.date_range(start='2024-01-01', periods=24, freq='h'),
             '使用率': np.random.uniform(20, 60, 24)
         })
         fig = go.Figure(go.Scatter(
@@ -159,12 +159,12 @@ def show_overview():
             line=dict(color='#1f77b4')
         ))
         fig.update_layout(height=250, margin=dict(l=20, r=20, t=20, b=20))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, key="cpu_chart")
     
     with col2:
         st.subheader("内存 使用率")
         mem_data = pd.DataFrame({
-            '时间': pd.date_range(start='2024-01-01', periods=24, freq='H'),
+            '时间': pd.date_range(start='2024-01-01', periods=24, freq='h'),
             '使用率': np.random.uniform(40, 70, 24)
         })
         fig = go.Figure(go.Scatter(
@@ -174,7 +174,7 @@ def show_overview():
             line=dict(color='#ff7f0e')
         ))
         fig.update_layout(height=250, margin=dict(l=20, r=20, t=20, b=20))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, key="mem_chart")
 
 
 def show_backtest_results():
@@ -193,7 +193,7 @@ def show_backtest_results():
         '胜率': [62.5, 58.3, 45.2, 60.5, 65.8]
     })
     
-    st.dataframe(backtest_data, use_container_width=True)
+    st.dataframe(backtest_data)
     
     st.markdown("---")
     
@@ -221,10 +221,13 @@ def show_backtest_results():
         xaxis_title='策略'
     )
     
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, key="returns_chart")
     
     # 风险收益散点图
     st.subheader("风险-收益分析")
+    
+    # 确保 marker size 为正数
+    marker_sizes = np.abs(backtest_data['夏普比率']) * 10
     
     fig = go.Figure()
     fig.add_trace(go.Scatter(
@@ -234,7 +237,7 @@ def show_backtest_results():
         text=backtest_data['策略名称'],
         textposition='top center',
         marker=dict(
-            size=backtest_data['夏普比率'] * 10,
+            size=marker_sizes,
             color=backtest_data['夏普比率'],
             colorscale='Viridis',
             showscale=True,
@@ -248,7 +251,7 @@ def show_backtest_results():
         yaxis_title='年化收益 (%)'
     )
     
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, key="risk_return_chart")
 
 
 def show_risk_monitor():

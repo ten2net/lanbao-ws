@@ -5,8 +5,7 @@ pandas>=2.0.0
 scipy>=1.10.0
 
 # ROS2相关
-rclpy>=3.3.0
-rosidl_runtime_py>=0.9.0
+rosdep>=0.26.0
 
 # 数据源
 tushare>=1.2.89

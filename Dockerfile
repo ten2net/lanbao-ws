@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     python3-venv \
     python3-dev \
     build-essential \
+    python3-rosdep \
     git \
     wget \
     curl \
@@ -20,7 +21,7 @@ RUN apt-get update && apt-get install -y \
 
 # 安装Python依赖
 COPY requirements.txt /workspace/
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 创建工作目录
 RUN mkdir -p /workspace/src /workspace/data /workspace/logs /workspace/config
@@ -32,7 +33,7 @@ COPY notebooks/ /workspace/notebooks/
 COPY scripts/ /workspace/scripts/
 
 # 设置环境变量
-ENV PYTHONPATH=/workspace/src:$PYTHONPATH
+ENV PYTHONPATH="/workspace/src:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages"
 ENV ROS_DOMAIN_ID=0
 ENV LANBAO_LOG_LEVEL=INFO
 
@@ -48,8 +49,9 @@ source /workspace/install/setup.bash\n\
 exec "$@"\n' > /workspace/entrypoint.sh && chmod +x /workspace/entrypoint.sh
 
 # 暴露端口
-EXPOSE 8888  # Jupyter
-EXPOSE 8501  # Streamlit
+# 8888 - Jupyter, 8501 - Streamlit
+EXPOSE 8888
+EXPOSE 8501
 
 # 入口点
 ENTRYPOINT ["/workspace/entrypoint.sh"]

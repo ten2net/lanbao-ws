@@ -129,7 +129,7 @@ services:
       - ./data:/workspace/data
       - ./config:/workspace/config
     ports:
-      - "8501:8501"
+      - "8502:8501"
     networks:
       - lanbao-network
     depends_on:

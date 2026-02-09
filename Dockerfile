@@ -42,11 +42,9 @@ RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
     cd /workspace && \
     colcon build --packages-select lanbao_interfaces lanbao_core lanbao_data lanbao_strategy lanbao_backtest lanbao_risk lanbao_monitor"
 
-# 创建启动脚本
-RUN echo '#!/bin/bash\n\
-source /opt/ros/humble/setup.bash\n\
-source /workspace/install/setup.bash\n\
-exec "$@"\n' > /workspace/entrypoint.sh && chmod +x /workspace/entrypoint.sh
+# 复制启动脚本
+COPY entrypoint.sh /workspace/entrypoint.sh
+RUN chmod +x /workspace/entrypoint.sh
 
 # 暴露端口
 # 8888 - Jupyter, 8501 - Streamlit

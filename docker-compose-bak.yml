@@ -14,7 +14,6 @@ services:
       - TUSHARE_TOKEN=${TUSHARE_TOKEN}
       - LANBAO_LOG_LEVEL=INFO
     volumes:
-      - .:/workspace
       - ./data:/workspace/data
       - ./logs:/workspace/logs
       - ./config:/workspace/config
@@ -31,7 +30,6 @@ services:
       - ROS_DOMAIN_ID=0
       - TUSHARE_TOKEN=${TUSHARE_TOKEN}
     volumes:
-      - .:/workspace
       - ./data:/workspace/data
       - ./logs:/workspace/logs
     networks:
@@ -48,7 +46,6 @@ services:
     environment:
       - ROS_DOMAIN_ID=0
     volumes:
-      - .:/workspace
       - ./data:/workspace/data
       - ./logs:/workspace/logs
     networks:
@@ -66,7 +63,6 @@ services:
     environment:
       - ROS_DOMAIN_ID=0
     volumes:
-      - .:/workspace
       - ./data:/workspace/data
       - ./config:/workspace/config
     networks:
@@ -82,8 +78,6 @@ services:
     container_name: lanbao-risk
     environment:
       - ROS_DOMAIN_ID=0
-    volumes:
-      - .:/workspace
     networks:
       - lanbao-network
     depends_on:
@@ -98,7 +92,6 @@ services:
     environment:
       - ROS_DOMAIN_ID=0
     volumes:
-      - .:/workspace
       - ./logs:/workspace/logs
     networks:
       - lanbao-network
@@ -115,7 +108,6 @@ services:
       - ROS_DOMAIN_ID=0
       - TUSHARE_TOKEN=${TUSHARE_TOKEN}
     volumes:
-      - .:/workspace
       - ./data:/workspace/data
       - ./notebooks:/workspace/notebooks
       - ./config:/workspace/config
@@ -134,7 +126,6 @@ services:
     environment:
       - ROS_DOMAIN_ID=0
     volumes:
-      - .:/workspace
       - ./data:/workspace/data
       - ./config:/workspace/config
     ports:

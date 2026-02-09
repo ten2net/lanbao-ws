@@ -15,12 +15,30 @@ services:
       - LANBAO_LOG_LEVEL=INFO
     volumes:
       - .:/workspace
+      - lanbao_core_install:/workspace/install
       - ./data:/workspace/data
       - ./logs:/workspace/logs
       - ./config:/workspace/config
     networks:
       - lanbao-network
-    command: ros2 launch lanbao_core lanbao.launch.py
+    command: >
+      bash -c '
+        if [ ! -f /workspace/install/lanbao_core/share/lanbao_core/launch/lanbao.launch.py ]; then
+          echo "Building all ROS2 packages..." &&
+          source /opt/ros/humble/setup.bash &&
+          cd /workspace &&
+          colcon build 2>&1 &&
+          for pkg in lanbao_core lanbao_data lanbao_strategy lanbao_backtest lanbao_risk lanbao_monitor; do
+            mkdir -p /workspace/install/$$pkg/lib/$$pkg &&
+            for exe in $$(ls /workspace/install/$$pkg/bin/ 2>/dev/null); do
+              ln -sf /workspace/install/$$pkg/bin/$$exe /workspace/install/$$pkg/lib/$$pkg/$$exe 2>/dev/null || true;
+            done;
+          done;
+        fi &&
+        touch /workspace/install/.build_complete &&
+        source /workspace/install/setup.bash &&
+        ros2 launch lanbao_core lanbao.launch.py
+      '
 
   # 市场数据节点
   market-data:
@@ -32,13 +50,22 @@ services:
       - TUSHARE_TOKEN=${TUSHARE_TOKEN}
     volumes:
       - .:/workspace
+      - lanbao_core_install:/workspace/install  # 共享 core 的 install
       - ./data:/workspace/data
       - ./logs:/workspace/logs
     networks:
       - lanbao-network
     depends_on:
       - lanbao-core
-    command: ros2 run lanbao_data market_data_node
+    command: >
+      bash -c '
+        until [ -f /workspace/install/.build_complete ]; do
+          echo "Waiting for build...";
+          sleep 2;
+        done;
+        source /workspace/install/setup.bash &&
+        ros2 run lanbao_data market_data_node
+      '
 
   # 回测引擎节点
   backtest-engine:
@@ -49,6 +76,7 @@ services:
       - ROS_DOMAIN_ID=0
     volumes:
       - .:/workspace
+      - lanbao_core_install:/workspace/install
       - ./data:/workspace/data
       - ./logs:/workspace/logs
     networks:
@@ -56,7 +84,15 @@ services:
     depends_on:
       - lanbao-core
       - market-data
-    command: ros2 run lanbao_backtest backtest_engine_node
+    command: >
+      bash -c "
+        until [ -f /workspace/install/.build_complete ]; do
+          echo 'Waiting for build...';
+          sleep 2;
+        done;
+        source /workspace/install/setup.bash &&
+        ros2 run lanbao_backtest backtest_engine_node
+      "
 
   # 策略管理节点
   strategy-manager:
@@ -67,13 +103,22 @@ services:
       - ROS_DOMAIN_ID=0
     volumes:
       - .:/workspace
+      - lanbao_core_install:/workspace/install
       - ./data:/workspace/data
       - ./config:/workspace/config
     networks:
       - lanbao-network
     depends_on:
       - lanbao-core
-    command: ros2 run lanbao_strategy strategy_manager_node
+    command: >
+      bash -c "
+        until [ -f /workspace/install/.build_complete ]; do
+          echo 'Waiting for build...';
+          sleep 2;
+        done;
+        source /workspace/install/setup.bash &&
+        ros2 run lanbao_strategy strategy_manager_node
+      "
 
   # 风险控制节点
   risk-control:
@@ -84,11 +129,20 @@ services:
       - ROS_DOMAIN_ID=0
     volumes:
       - .:/workspace
+      - lanbao_core_install:/workspace/install
     networks:
       - lanbao-network
     depends_on:
       - lanbao-core
-    command: ros2 run lanbao_risk risk_control_node
+    command: >
+      bash -c "
+        until [ -f /workspace/install/.build_complete ]; do
+          echo 'Waiting for build...';
+          sleep 2;
+        done;
+        source /workspace/install/setup.bash &&
+        ros2 run lanbao_risk risk_control_node
+      "
 
   # 监控节点
   monitor:
@@ -99,12 +153,21 @@ services:
       - ROS_DOMAIN_ID=0
     volumes:
       - .:/workspace
+      - lanbao_core_install:/workspace/install
       - ./logs:/workspace/logs
     networks:
       - lanbao-network
     depends_on:
       - lanbao-core
-    command: ros2 run lanbao_monitor monitor_node
+    command: >
+      bash -c "
+        until [ -f /workspace/install/.build_complete ]; do
+          echo 'Waiting for build...';
+          sleep 2;
+        done;
+        source /workspace/install/setup.bash &&
+        ros2 run lanbao_monitor monitor_node
+      "
 
   # Jupyter研究环境
   jupyter:
@@ -153,3 +216,5 @@ networks:
 volumes:
   lanbao-data:
   lanbao-logs:
+  # ROS2 共享 install 目录
+  lanbao_core_install:

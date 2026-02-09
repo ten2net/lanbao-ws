@@ -11,6 +11,7 @@ setup(
     data_files=[
         ('share/ament_index/resource_index/packages', [f'resource/{package_name}']),
         (f'share/{package_name}', ['package.xml']),
+        (os.path.join('share', package_name, 'launch'), glob(os.path.join('launch', '*.launch.py'))),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -19,4 +20,9 @@ setup(
     description='揽宝核心框架 - 节点基类和公共组件',
     license='MIT',
     tests_require=['pytest'],
+    entry_points={
+        'console_scripts': [
+            'core_node = lanbao_core.core_node:main',
+        ],
+    },
 )

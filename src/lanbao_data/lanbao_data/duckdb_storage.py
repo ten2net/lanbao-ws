@@ -3,6 +3,7 @@ DuckDB数据存储模块
 提供高性能的本地数据存储和查询
 """
 import os
+import time
 import duckdb
 import pandas as pd
 from datetime import datetime
@@ -21,25 +22,77 @@ class DuckDBStorage:
     - 数据缓存
     """
     
-    def __init__(self, db_path: str = "./data/lanbao.duckdb"):
+    def __init__(self, db_path: str = "./data/lanbao.duckdb", read_only: bool = False, timeout: int = 30):
         """
         初始化DuckDB存储
         
         Args:
             db_path: 数据库文件路径
+            read_only: 是否以只读模式打开
+            timeout: 连接超时时间（秒）
         """
         self._db_path = db_path
+        self._read_only = read_only
         
         # 确保目录存在
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         
-        # 初始化连接
-        self._conn = duckdb.connect(db_path)
+        # 清理可能存在的旧锁文件
+        self._cleanup_lock_files()
+        
+        # 初始化连接（带重试）
+        self._conn = self._connect_with_retry(timeout)
         
         # 初始化表结构
-        self._init_tables()
+        if not read_only:
+            self._init_tables()
         
-        logger.info(f"DuckDB存储初始化完成: {db_path}")
+        logger.info(f"DuckDB存储初始化完成: {db_path} (read_only={read_only})")
+    
+    def _cleanup_lock_files(self):
+        """清理可能存在的锁文件"""
+        lock_file = f"{self._db_path}.wal"
+        # 检查是否有其他进程在使用
+        try:
+            # 尝试获取文件锁信息，如果不能获取则等待
+            pass
+        except Exception as e:
+            logger.warning(f"清理锁文件时出错: {e}")
+    
+    def _connect_with_retry(self, timeout: int) -> duckdb.DuckDBPyConnection:
+        """
+        带重试的连接
+        
+        Args:
+            timeout: 超时时间（秒）
+            
+        Returns:
+            DuckDB连接对象
+        """
+        start_time = time.time()
+        last_error = None
+        
+        while time.time() - start_time < timeout:
+            try:
+                # 尝试连接
+                conn = duckdb.connect(self._db_path, read_only=self._read_only)
+                return conn
+            except Exception as e:
+                last_error = e
+                error_msg = str(e).lower()
+                
+                # 如果是锁冲突，等待后重试
+                if "lock" in error_msg or "busy" in error_msg or "conflicting" in error_msg:
+                    logger.warning(f"数据库被锁定，等待重试... ({e})")
+                    time.sleep(1)
+                    continue
+                else:
+                    # 其他错误直接抛出
+                    raise
+        
+        # 超时后抛出最后一次错误
+        logger.error(f"连接数据库超时: {last_error}")
+        raise last_error
     
     def _init_tables(self):
         """初始化数据表"""

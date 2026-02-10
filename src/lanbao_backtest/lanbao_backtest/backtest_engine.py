@@ -112,6 +112,10 @@ class BacktestEngine:
         
         # 数据准备
         df = data.copy()
+        # 如果存在date列，将其设置为索引并转换为datetime
+        if 'date' in df.columns:
+            df['date'] = pd.to_datetime(df['date'])
+            df.set_index('date', inplace=True)
         df = df.sort_index()
         
         # 生成交易信号
@@ -236,8 +240,8 @@ class BacktestEngine:
             backtest_id=backtest_id,
             strategy_id=strategy_id,
             symbol=symbol,
-            start_date=str(data.index[0]),
-            end_date=str(data.index[-1]),
+            start_date=self._format_date(data.index[0]),
+            end_date=self._format_date(data.index[-1]),
             total_pnl=capital - config.initial_capital,
             equity_curve=pd.Series(equity, index=data.index),
             trades=trades
@@ -259,29 +263,32 @@ class BacktestEngine:
         initial_capital = self._config.initial_capital
         
         # 总收益
-        result.total_return = (equity.iloc[-1] - initial_capital) / initial_capital
+        result.total_return = float((equity.iloc[-1] - initial_capital) / initial_capital)
         
         # 年化收益
         days = len(equity)
         if days > 1:
-            result.annual_return = (1 + result.total_return) ** (252 / days) - 1
+            result.annual_return = float((1 + result.total_return) ** (252 / days) - 1)
         
         # 日收益率
         daily_returns = equity.pct_change().dropna()
         result.daily_returns = daily_returns
         
         # 波动率
-        result.volatility = daily_returns.std() * np.sqrt(252)
+        if len(daily_returns) > 0:
+            result.volatility = float(daily_returns.std() * np.sqrt(252))
+        else:
+            result.volatility = 0.0
         
         # 夏普比率 (假设无风险利率为3%)
         risk_free_rate = 0.03
         if result.volatility > 0:
-            result.sharpe_ratio = (result.annual_return - risk_free_rate) / result.volatility
+            result.sharpe_ratio = float((result.annual_return - risk_free_rate) / result.volatility)
         
         # 最大回撤
         cummax = equity.cummax()
         drawdown = (equity - cummax) / cummax
-        result.max_drawdown = drawdown.min()
+        result.max_drawdown = float(drawdown.min())
         
         # 交易统计
         trades = result.trades
@@ -292,16 +299,42 @@ class BacktestEngine:
             if sell_trades:
                 result.winning_trades = sum(1 for t in sell_trades if t.pnl > 0)
                 result.losing_trades = sum(1 for t in sell_trades if t.pnl <= 0)
-                result.win_rate = result.winning_trades / len(sell_trades)
-                result.avg_trade_return = np.mean([t.pnl for t in sell_trades])
+                result.win_rate = float(result.winning_trades / len(sell_trades))
+                result.avg_trade_return = float(np.mean([t.pnl for t in sell_trades]))
                 
                 # 盈亏比
                 gross_profit = sum(t.pnl for t in sell_trades if t.pnl > 0)
                 gross_loss = abs(sum(t.pnl for t in sell_trades if t.pnl < 0))
                 if gross_loss > 0:
-                    result.profit_factor = gross_profit / gross_loss
+                    result.profit_factor = float(gross_profit / gross_loss)
         
         return result
+    
+    def _format_date(self, date_obj) -> str:
+        """
+        格式化日期对象为YYYY-MM-DD字符串
+        
+        Args:
+            date_obj: 日期对象，可以是datetime、Timestamp、str或int
+            
+        Returns:
+            格式化后的日期字符串
+        """
+        import pandas as pd
+        from datetime import datetime
+        
+        if isinstance(date_obj, (datetime, pd.Timestamp)):
+            return date_obj.strftime('%Y-%m-%d')
+        elif isinstance(date_obj, str):
+            # 尝试解析字符串
+            try:
+                dt = pd.to_datetime(date_obj)
+                return dt.strftime('%Y-%m-%d')
+            except:
+                return date_obj  # 返回原字符串
+        else:
+            # 其他类型（如int）转换为字符串
+            return str(date_obj)
     
     def get_result(self, backtest_id: str) -> Optional[BacktestResult]:
         """获取回测结果"""

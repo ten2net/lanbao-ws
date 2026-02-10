@@ -4,8 +4,10 @@ DuckDB数据存储模块
 """
 import os
 import time
+import json
 import duckdb
 import pandas as pd
+import numpy as np
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pathlib import Path
@@ -318,6 +320,30 @@ class DuckDBStorage:
             是否成功
         """
         try:
+            # 数据转换函数
+            def _convert_value(value):
+                """转换值为数据库兼容格式"""
+                if value is None:
+                    return None
+                # 处理numpy类型
+                if isinstance(value, np.floating):
+                    return float(value)
+                if isinstance(value, np.integer):
+                    return int(value)
+                if isinstance(value, np.bool_):
+                    return bool(value)
+                # 处理字典 -> JSON字符串
+                if isinstance(value, dict):
+                    return json.dumps(value, ensure_ascii=False)
+                # 其他类型保持不变
+                return value
+            
+            # 准备插入数据
+            params = result.get('params', {})
+            # 确保params是字典
+            if not isinstance(params, dict):
+                params = {}
+            
             self._conn.execute("""
                 INSERT OR REPLACE INTO backtest_results VALUES (
                     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP
@@ -328,14 +354,14 @@ class DuckDBStorage:
                 result.get('symbol', ''),
                 result.get('start_date'),
                 result.get('end_date'),
-                result.get('total_return', 0),
-                result.get('annual_return', 0),
-                result.get('sharpe_ratio', 0),
-                result.get('max_drawdown', 0),
-                result.get('volatility', 0),
-                result.get('win_rate', 0),
-                result.get('trades_count', 0),
-                str(result.get('params', {}))
+                _convert_value(result.get('total_return', 0)),
+                _convert_value(result.get('annual_return', 0)),
+                _convert_value(result.get('sharpe_ratio', 0)),
+                _convert_value(result.get('max_drawdown', 0)),
+                _convert_value(result.get('volatility', 0)),
+                _convert_value(result.get('win_rate', 0)),
+                _convert_value(result.get('trades_count', 0)),
+                _convert_value(params)
             ])
             
             logger.info(f"保存回测结果: {result['backtest_id']}")

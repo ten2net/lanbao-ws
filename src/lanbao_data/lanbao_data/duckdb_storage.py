@@ -189,12 +189,23 @@ class DuckDBStorage:
             df = data.copy()
             df['symbol'] = symbol
             
+            # 列名映射：Tushare列名 -> 数据库列名
+            column_mapping = {
+                'pct_chg': 'change_pct',
+                'vol': 'volume'
+            }
+            df = df.rename(columns=column_mapping)
+            
             # 确保列名正确
             required_cols = ['symbol', 'date', 'open', 'high', 'low', 'close', 'volume']
             for col in required_cols:
                 if col not in df.columns:
                     logger.warning(f"数据缺少必要列: {col}")
                     return False
+            
+            # 添加数据源列（如果不存在）
+            if 'data_source' not in df.columns:
+                df['data_source'] = 'tushare'
             
             # 删除已存在的数据(增量更新)
             dates = df['date'].tolist()
@@ -309,7 +320,7 @@ class DuckDBStorage:
         try:
             self._conn.execute("""
                 INSERT OR REPLACE INTO backtest_results VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP
                 )
             """, [
                 result['backtest_id'],

@@ -177,8 +177,10 @@ services:
     environment:
       - ROS_DOMAIN_ID=0
       - TUSHARE_TOKEN=${TUSHARE_TOKEN}
+      - PYTHONPATH=/workspace/src:/workspace/install:$PYTHONPATH
     volumes:
       - .:/workspace
+      - lanbao_core_install:/workspace/install  # 使用容器构建的版本
       - ./data:/workspace/data
       - ./notebooks:/workspace/notebooks
       - ./config:/workspace/config
@@ -187,7 +189,14 @@ services:
       - "8888:8888"
     networks:
       - lanbao-network
-    command: jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token=''
+    command: >
+      bash -c "
+        until [ -f /workspace/install/.build_complete ]; do
+          echo 'Waiting for build...';
+          sleep 2;
+        done;
+        jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token=''
+      "
 
   # Web监控界面 (Streamlit)
   web:

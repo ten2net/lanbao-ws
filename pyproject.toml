@@ -28,8 +28,11 @@ dependencies = [
     # 数据源
     "tushare>=1.2.89",
     "akshare>=1.10.0",
+    "pytdx>=1.72",
     "requests>=2.31.0",
     "websocket-client>=1.6.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=4.9.0",
     # 数据存储
     "duckdb>=0.9.0",
     "sqlalchemy>=2.0.0",

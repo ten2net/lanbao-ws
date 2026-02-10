@@ -63,8 +63,7 @@ services:
           echo "Waiting for build...";
           sleep 2;
         done;
-        source /workspace/install/setup.bash &&
-        ros2 run lanbao_data market_data_node
+        /workspace/install/lanbao_data/bin/market_data_node
       '
 
   # 回测引擎节点
@@ -90,8 +89,7 @@ services:
           echo 'Waiting for build...';
           sleep 2;
         done;
-        source /workspace/install/setup.bash &&
-        ros2 run lanbao_backtest backtest_engine_node
+        /workspace/install/lanbao_backtest/bin/backtest_engine_node
       "
 
   # 策略管理节点
@@ -116,8 +114,7 @@ services:
           echo 'Waiting for build...';
           sleep 2;
         done;
-        source /workspace/install/setup.bash &&
-        ros2 run lanbao_strategy strategy_manager_node
+        /workspace/install/lanbao_strategy/bin/strategy_manager_node
       "
 
   # 风险控制节点
@@ -140,8 +137,7 @@ services:
           echo 'Waiting for build...';
           sleep 2;
         done;
-        source /workspace/install/setup.bash &&
-        ros2 run lanbao_risk risk_control_node
+        /workspace/install/lanbao_risk/bin/risk_control_node
       "
 
   # 监控节点
@@ -165,8 +161,7 @@ services:
           echo 'Waiting for build...';
           sleep 2;
         done;
-        source /workspace/install/setup.bash &&
-        ros2 run lanbao_monitor monitor_node
+        /workspace/install/lanbao_monitor/bin/monitor_node
       "
 
   # Jupyter研究环境

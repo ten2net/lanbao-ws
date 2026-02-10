@@ -48,6 +48,11 @@ services:
     environment:
       - ROS_DOMAIN_ID=0
       - TUSHARE_TOKEN=${TUSHARE_TOKEN}
+      # 数据源配置：miniqmt,tushare,akshare,tdx（按优先级排序）
+      - LANBAO_DATA_SOURCES=${LANBAO_DATA_SOURCES:-tushare,akshare}
+      # MiniQMT配置（如启用）
+      - QMT_PATH=${QMT_PATH}
+      - QMT_ACCOUNT_ID=${QMT_ACCOUNT_ID}
     volumes:
       - .:/workspace
       - lanbao_core_install:/workspace/install  # 共享 core 的 install

@@ -106,7 +106,9 @@ class BacktestEngine:
             回测结果
         """
         if backtest_id is None:
-            backtest_id = f"bt_{strategy_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            # 清理策略ID中的特殊字符
+            clean_strategy_id = strategy_id.replace('/', '_').replace('\\', '_')
+            backtest_id = f"bt_{clean_strategy_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
         logger.info(f"开始回测: {backtest_id} for {symbol}")
         

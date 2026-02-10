@@ -113,7 +113,9 @@ class BacktestEngineNode(LanBaoBaseNode):
                 return response
             
             # 生成回测ID
-            backtest_id = f"bt_{request.strategy_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            # 清理策略ID中的特殊字符
+            clean_strategy_id = request.strategy_id.replace('/', '_').replace('\\', '_')
+            backtest_id = f"bt_{clean_strategy_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             
             # 获取策略信号生成器
             signal_generator = self._get_signal_generator(request.strategy_id)
@@ -151,7 +153,9 @@ class BacktestEngineNode(LanBaoBaseNode):
         执行回测动作
         """
         goal = goal_handle.request
-        backtest_id = f"bt_{goal.strategy_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        # 清理策略ID中的特殊字符
+        clean_strategy_id = goal.strategy_id.replace('/', '_').replace('\\', '_')
+        backtest_id = f"bt_{clean_strategy_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
         logger.info(f"开始动作回测: {backtest_id}")
         

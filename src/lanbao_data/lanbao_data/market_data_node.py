@@ -2,6 +2,7 @@
 市场数据节点 - ROS2节点实现
 """
 import os
+from typing import Optional
 import rclpy
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from loguru import logger
@@ -42,7 +43,7 @@ class MarketDataNode(DataProcessorNode):
         # 数据源适配器字典
         self._adapters = {}
         self._data_sources = []  # 按优先级排序的数据源列表
-        self._storage: DuckDBStorage = None
+        self._storage: DuckDBStorage = None # type: ignore
         
         # 数据缓存
         self._subscribed_symbols = set()

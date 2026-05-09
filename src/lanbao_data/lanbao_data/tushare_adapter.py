@@ -59,40 +59,42 @@ class TushareAdapter:
         self._last_request_time = time.time()
     
     def get_daily_data(self, symbol: str, start_date: Optional[str] = None,
-                       end_date: Optional[str] = None) -> pd.DataFrame:
+                       end_date: Optional[str] = None,
+                       adjust: str = 'qfq') -> pd.DataFrame:
         """
-        获取日线数据
-        
+        获取日线数据，支持前复权
+
         Args:
             symbol: 股票代码，如 '000001.SZ'
             start_date: 开始日期 'YYYYMMDD'
             end_date: 结束日期 'YYYYMMDD'
-            
+            adjust: 复权类型，'qfq'前复权(默认)，'none'不复权
+
         Returns:
-            DataFrame包含OHLCV数据
+            DataFrame包含OHLCV数据及前复权价格
         """
         try:
             self._rate_limit()
-            
+
             # 转换股票代码格式
             ts_code = self._convert_symbol(symbol)
-            
+
             # 设置默认日期
             if not end_date:
                 end_date = datetime.now().strftime('%Y%m%d')
             if not start_date:
                 start_date = (datetime.now() - timedelta(days=365)).strftime('%Y%m%d')
-            
+
             df = self._pro.daily(
                 ts_code=ts_code,
                 start_date=start_date,
                 end_date=end_date
             )
-            
+
             if df is None or df.empty:
                 logger.warning(f"未获取到 {symbol} 的数据")
                 return pd.DataFrame()
-            
+
             # 标准化列名
             df = df.rename(columns={
                 'ts_code': 'symbol',
@@ -104,21 +106,111 @@ class TushareAdapter:
                 'vol': 'volume',
                 'amount': 'amount'
             })
-            
+
             # 转换日期
             df['date'] = pd.to_datetime(df['date'])
             df = df.sort_values('date')
-            
+
             # 添加数据源标记
             df['data_source'] = 'tushare'
-            
-            logger.debug(f"获取 {symbol} 日线数据: {len(df)} 条")
+
+            # 计算前复权价格
+            if adjust == 'qfq':
+                adj_df = self._get_adj_factor(ts_code, start_date, end_date)
+                if not adj_df.empty:
+                    df = df.merge(adj_df, on=['symbol', 'date'], how='left')
+                    latest_adj = adj_df['adj_factor'].iloc[-1]
+                    for col in ['open', 'high', 'low', 'close']:
+                        df[f'{col}_adj'] = df[col] * df['adj_factor'] / latest_adj
+                else:
+                    logger.warning(f"{symbol}: 未获取到复权因子，使用原始价格")
+                    for col in ['open', 'high', 'low', 'close']:
+                        df[f'{col}_adj'] = df[col]
+                    df['adj_factor'] = 1.0
+            else:
+                for col in ['open', 'high', 'low', 'close']:
+                    df[f'{col}_adj'] = df[col]
+                df['adj_factor'] = 1.0
+
+            logger.debug(f"获取 {symbol} 日线数据: {len(df)} 条 ({adjust})")
             return df
-            
+
         except Exception as e:
             logger.error(f"获取 {symbol} 日线数据失败: {e}")
             return pd.DataFrame()
+
+    def _get_adj_factor(self, ts_code: str, start_date: str, end_date: str) -> pd.DataFrame:
+        """
+        获取复权因子（内部方法）
+
+        Args:
+            ts_code: Tushare格式代码
+            start_date: 开始日期
+            end_date: 结束日期
+
+        Returns:
+            DataFrame包含symbol, date, adj_factor
+        """
+        try:
+            self._rate_limit()
+
+            df = self._pro.adj_factor(
+                ts_code=ts_code,
+                start_date=start_date,
+                end_date=end_date
+            )
+
+            if df is None or df.empty:
+                return pd.DataFrame()
+
+            df = df.rename(columns={
+                'ts_code': 'symbol',
+                'trade_date': 'date'
+            })
+            df['date'] = pd.to_datetime(df['date'])
+            df['adj_factor'] = df['adj_factor'].astype(float)
+
+            return df[['symbol', 'date', 'adj_factor']].sort_values('date')
+
+        except Exception as e:
+            logger.warning(f"获取 {ts_code} 复权因子失败: {e}")
+            return pd.DataFrame()
     
+    def get_trade_calendar(self, start_date: str, end_date: str,
+                           exchange: str = 'SSE') -> List[str]:
+        """
+        获取交易日历
+
+        Args:
+            start_date: 开始日期 'YYYYMMDD'
+            end_date: 结束日期 'YYYYMMDD'
+            exchange: 交易所，默认'SSE'（上交所）
+
+        Returns:
+            交易日列表 ['YYYYMMDD', ...]
+        """
+        try:
+            self._rate_limit()
+
+            df = self._pro.trade_cal(
+                exchange=exchange,
+                start_date=start_date,
+                end_date=end_date
+            )
+
+            if df is None or df.empty:
+                logger.warning(f"未获取到交易日历: {start_date} ~ {end_date}")
+                return []
+
+            # 筛选开盘日
+            trade_dates = df[df['is_open'] == 1]['cal_date'].tolist()
+            logger.debug(f"获取交易日历: {len(trade_dates)} 个交易日")
+            return trade_dates
+
+        except Exception as e:
+            logger.error(f"获取交易日历失败: {e}")
+            return []
+
     def get_stock_list(self, market: str = 'A') -> pd.DataFrame:
         """
         获取股票列表
@@ -148,7 +240,9 @@ class TushareAdapter:
             if df is None or df.empty:
                 return pd.DataFrame()
             
-            # 标准化
+            # 标准化：ts_code -> symbol，如果已有symbol列则先删除
+            if 'symbol' in df.columns:
+                df = df.drop(columns=['symbol'])
             df = df.rename(columns={'ts_code': 'symbol'})
             df['market'] = market
             

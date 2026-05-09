@@ -68,19 +68,23 @@ echo "正在启动节点..."
 start_node "market_data" "lanbao_data" "lanbao_data.market_data_node"
 sleep 2
 
-# 2. 回测引擎节点
+# 2. 数据同步节点
+start_node "data_sync" "lanbao_data" "lanbao_data.data_sync_node"
+sleep 1
+
+# 3. 回测引擎节点
 start_node "backtest" "lanbao_backtest" "lanbao_backtest.backtest_engine_node"
 sleep 1
 
-# 3. 策略管理节点
+# 4. 策略管理节点
 start_node "strategy" "lanbao_strategy" "lanbao_strategy.strategy_manager_node"
 sleep 1
 
-# 4. 风险控制节点
+# 5. 风险控制节点
 start_node "risk" "lanbao_risk" "lanbao_risk.risk_control_node"
 sleep 1
 
-# 5. 监控节点
+# 6. 监控节点
 start_node "monitor" "lanbao_monitor" "lanbao_monitor.monitor_node"
 
 echo ""

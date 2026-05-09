@@ -55,21 +55,35 @@ risk:
     consecutive_losses: 5  # 连续亏损次数触发熔断
     drawdown_threshold: 0.15  # 回撤阈值触发熔断
 
+# 数据同步配置
+data_sync:
+  enabled: true
+  # 首次全量同步起始日期
+  start_date: "20200101"
+  # 每日定时执行时间 (HH:MM)
+  schedule_time: "17:00"
+  # 是否启动时立即执行一次同步
+  run_on_startup: true
+  # 批量大小（每处理N只股票报告一次进度）
+  batch_report_interval: 100
+  # 并发下载线程数（Tushare 100ms间隔，单线程约10 QPS）
+  max_workers: 1
+
 # 节点配置
 nodes:
   market_data_node:
     publish_rate: 1.0
     update_interval: 60  # 数据更新间隔(秒)
-    
+
   backtest_engine_node:
     max_concurrent_backtests: 5
     default_initial_capital: 100000.0
-    
+
   strategy_manager_node:
     max_strategies: 20
-    
+
   risk_control_node:
     check_interval: 1  # 风险检查间隔(秒)
-    
+
   monitor_node:
     system_check_interval: 10  # 系统监控间隔(秒)

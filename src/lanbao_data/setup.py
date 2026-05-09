@@ -20,6 +20,7 @@ setup(
     entry_points={
         'console_scripts': [
             'market_data_node = lanbao_data.market_data_node:main',
+            'data_sync_node = lanbao_data.data_sync_node:main',
         ],
     },
 )

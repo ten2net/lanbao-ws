@@ -137,6 +137,7 @@ docker-compose down
 - **数据库**: DuckDB
 - **容器**: Docker, Docker Compose
 - **研究环境**: Jupyter Lab
+- **PYTHON包管理工具**: uv
 
 ## 相关文档
 

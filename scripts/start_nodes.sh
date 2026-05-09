@@ -28,7 +28,7 @@ mkdir -p logs
 
 # 基础PYTHONPATH (注意: lanbao_interfaces使用python3.11目录但包含python3.10的so文件)
 ROS_PYTHONPATH="/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages"
-LANBAO_PATHS="/home/ubuntu/lanbao_ws/install/lanbao_interfaces/lib/python3.11/site-packages:/home/ubuntu/lanbao_ws/install/lanbao_core/lib/python3.10/site-packages:/home/ubuntu/lanbao_ws/install/lanbao_data/lib/python3.10/site-packages:/home/ubuntu/lanbao_ws/install/lanbao_strategy/lib/python3.10/site-packages:/home/ubuntu/lanbao_ws/install/lanbao_backtest/lib/python3.10/site-packages:/home/ubuntu/lanbao_ws/install/lanbao_risk/lib/python3.10/site-packages:/home/ubuntu/lanbao_ws/install/lanbao_monitor/lib/python3.10/site-packages"
+LANBAO_PATHS="/data/wangf/lanbao_ws/install/lanbao_interfaces/lib/python3.11/site-packages:/data/wangf/lanbao_ws/install/lanbao_core/lib/python3.10/site-packages:/data/wangf/lanbao_ws/install/lanbao_data/lib/python3.10/site-packages:/data/wangf/lanbao_ws/install/lanbao_strategy/lib/python3.10/site-packages:/data/wangf/lanbao_ws/install/lanbao_backtest/lib/python3.10/site-packages:/data/wangf/lanbao_ws/install/lanbao_risk/lib/python3.10/site-packages:/data/wangf/lanbao_ws/install/lanbao_monitor/lib/python3.10/site-packages"
 
 # 启动函数
 start_node() {

@@ -160,7 +160,7 @@ class MarketDataNode(DataProcessorNode):
         # 先从本地存储查询
         data = self._storage.get_daily_data(symbol, start_date, end_date)
         
-        if not data.empty and len(data) >= 10:
+        if not data.empty:
             logger.debug(f"从本地缓存获取 {symbol} 数据: {len(data)} 条")
             return data
         

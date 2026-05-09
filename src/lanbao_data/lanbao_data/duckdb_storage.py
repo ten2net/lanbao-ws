@@ -233,37 +233,48 @@ class DuckDBStorage:
             logger.error(f"保存 {symbol} 数据失败: {e}")
             return False
     
+    def _normalize_date(self, date_str: Optional[str]) -> Optional[str]:
+        """将日期格式统一为 YYYY-MM-DD，兼容 YYYYMMDD 格式"""
+        if not date_str:
+            return None
+        if len(date_str) == 8 and date_str.isdigit():
+            return f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}"
+        return date_str
+
     def get_daily_data(self, symbol: str, start_date: Optional[str] = None,
                        end_date: Optional[str] = None) -> pd.DataFrame:
         """
         获取日线数据
-        
+
         Args:
             symbol: 股票代码
-            start_date: 开始日期
-            end_date: 结束日期
-            
+            start_date: 开始日期 (支持 YYYYMMDD 或 YYYY-MM-DD)
+            end_date: 结束日期 (支持 YYYYMMDD 或 YYYY-MM-DD)
+
         Returns:
             DataFrame包含日线数据
         """
         try:
             query = "SELECT * FROM stock_daily WHERE symbol = ?"
             params = [symbol]
-            
-            if start_date:
+
+            normalized_start = self._normalize_date(start_date)
+            normalized_end = self._normalize_date(end_date)
+
+            if normalized_start:
                 query += " AND date >= ?"
-                params.append(start_date)
-            if end_date:
+                params.append(normalized_start)
+            if normalized_end:
                 query += " AND date <= ?"
-                params.append(end_date)
-            
+                params.append(normalized_end)
+
             query += " ORDER BY date"
-            
+
             df = self._conn.execute(query, params).fetchdf()
-            
+
             logger.debug(f"查询 {symbol} 数据: {len(df)} 条")
             return df
-            
+
         except Exception as e:
             logger.error(f"查询 {symbol} 数据失败: {e}")
             return pd.DataFrame()

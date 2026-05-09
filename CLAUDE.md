@@ -110,10 +110,21 @@ Specialized base classes extend this:
 ## Data Layer Architecture
 
 Market data flows through multiple adapter classes with priority-based fallback:
-1. `TushareAdapter` (priority 1) — primary source, requires `TUSHARE_TOKEN`
-2. `AKShareAdapter` (priority 2) — free alternative
-3. `TDXAdapter` (priority 3) — 通达信本地数据
-4. `MiniQMTAdapter` (priority 4) — QMT量化交易终端
+
+| Adapter | Priority | Rate Limit | Notes |
+|---------|----------|------------|-------|
+| `TushareAdapter` | 1 | 0.1s | Primary source, requires `TUSHARE_TOKEN` |
+| `AKShareAdapter` | 3 | 3.0s | Free alternative, strict server-side rate limiting |
+| `TDXAdapter` | 2 | — | 通达信本地数据 (if available) |
+| `MiniQMTAdapter` | 4 | — | QMT量化交易终端 (if available) |
+
+**Data fetch flow** (`_get_data_from_source`):
+1. Query local DuckDB cache first
+2. If cache miss or empty → try adapters in priority order
+3. On successful remote fetch → save to DuckDB (`save_daily_data`)
+4. On failure (empty result or exception) → fallback to next adapter
+
+**Important**: `AKShareAdapter._min_interval` is set to **3.0 seconds** to avoid `RemoteDisconnected` errors from server-side rate limiting. Do not lower this value.
 
 Data is persisted to DuckDB via `DuckDBStorage`. The `MarketDataNode` manages adapter lifecycle and data source failover.
 

@@ -89,3 +89,5 @@ install/
 build/
 log/
 .mcp.json
+data/lanbao.duckdb
+data/lanbao.duckdb.wal

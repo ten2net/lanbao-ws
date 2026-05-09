@@ -49,7 +49,7 @@ source ./install/setup.bash
 export PYTHONPATH="${ROS_PYTHONPATH}:${LANBAO_INSTALL_PATHS}:${LANBAO_BUILD_PATHS}"
 export LD_LIBRARY_PATH=./install/lanbao_interfaces/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib:/usr/local/lib
 export PATH=/opt/ros/humble/bin:\$PATH
-./.venv/bin/python -m ${module} 2>&1
+exec ./.venv/bin/python -m ${module} 2>&1
 EOF
     chmod +x "logs/${node_name}_launcher.sh"
     

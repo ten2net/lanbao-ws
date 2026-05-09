@@ -28,7 +28,7 @@ class AKShareAdapter:
             raise ImportError("akshare库未安装，请运行: pip install akshare")
         
         self._last_request_time = 0
-        self._min_interval = 0.5  # 最小请求间隔(秒)，akshare对频繁请求有限制
+        self._min_interval = 3.0  # 最小请求间隔(秒)，akshare对频繁请求有限制
         self._priority = 3  # 数据源优先级
         
         logger.info("AkShare适配器初始化完成")

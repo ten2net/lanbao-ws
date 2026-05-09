@@ -168,8 +168,8 @@ class LanBaoBaseNode(ABC, Node):
             
             # 等待关闭信号
             while self._running and not self._shutdown_event.is_set():
+                rclpy.spin_once(self, timeout_sec=0.01)
                 self._main_loop()
-                time.sleep(0.01)  # 10ms间隔
                 
         except Exception as e:
             logger.exception(f"节点 [{self.get_name()}] 运行异常: {e}")
@@ -216,7 +216,7 @@ class LanBaoBaseNode(ABC, Node):
     def _publish_status(self):
         """发布节点状态"""
         try:
-            self._status.timestamp = self.get_clock().now().to_msg()
+            self._status.timestamp = int(self.get_clock().now().nanoseconds / 1_000_000)
             self._status_publisher.publish(self._status)
             self._metrics.increment_counter('status_published')
         except Exception as e:

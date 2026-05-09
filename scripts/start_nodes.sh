@@ -42,11 +42,11 @@ start_node() {
     cat > "logs/${node_name}_launcher.sh" << EOF
 #!/bin/bash
 source /opt/ros/humble/setup.bash
-source /home/ubuntu/lanbao_ws/install/setup.bash
+source /data/wangf/lanbao_ws/install/setup.bash
 export PYTHONPATH="${ROS_PYTHONPATH}:${LANBAO_PATHS}"
-export LD_LIBRARY_PATH=/home/ubuntu/lanbao_ws/install/lanbao_interfaces/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib:/usr/local/lib
+export LD_LIBRARY_PATH=/data/wangf/lanbao_ws/install/lanbao_interfaces/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib:/usr/local/lib
 export PATH=/opt/ros/humble/bin:\$PATH
-cd /home/ubuntu/lanbao_ws
+cd /data/wangf/lanbao_ws
 /usr/bin/python3 -m ${module} 2>&1
 EOF
     chmod +x "logs/${node_name}_launcher.sh"

@@ -88,3 +88,4 @@ app.log
 install/
 build/
 log/
+.mcp.json

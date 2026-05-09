@@ -28,9 +28,9 @@ mkdir -p logs
 
 # 基础PYTHONPATH (注意: lanbao_interfaces使用python3.11目录但包含python3.10的so文件)
 ROS_PYTHONPATH="/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages"
-LANBAO_INSTALL_PATHS="/data/wangf/lanbao_ws/install/lanbao_interfaces/lib/python3.10/site-packages:/data/wangf/lanbao_ws/install/lanbao_core/lib/python3.10/site-packages:/data/wangf/lanbao_ws/install/lanbao_data/lib/python3.10/site-packages:/data/wangf/lanbao_ws/install/lanbao_strategy/lib/python3.10/site-packages:/data/wangf/lanbao_ws/install/lanbao_backtest/lib/python3.10/site-packages:/data/wangf/lanbao_ws/install/lanbao_risk/lib/python3.10/site-packages:/data/wangf/lanbao_ws/install/lanbao_monitor/lib/python3.10/site-packages"
+LANBAO_INSTALL_PATHS="./install/lanbao_interfaces/lib/python3.10/site-packages:./install/lanbao_core/lib/python3.10/site-packages:./install/lanbao_data/lib/python3.10/site-packages:./install/lanbao_strategy/lib/python3.10/site-packages:./install/lanbao_backtest/lib/python3.10/site-packages:./install/lanbao_risk/lib/python3.10/site-packages:./install/lanbao_monitor/lib/python3.10/site-packages"
 # build目录包含实际的包代码(.egg-link指向这里)
-LANBAO_BUILD_PATHS="/data/wangf/lanbao_ws/build/lanbao_interfaces:/data/wangf/lanbao_ws/build/lanbao_core:/data/wangf/lanbao_ws/build/lanbao_data:/data/wangf/lanbao_ws/build/lanbao_strategy:/data/wangf/lanbao_ws/build/lanbao_backtest:/data/wangf/lanbao_ws/build/lanbao_risk:/data/wangf/lanbao_ws/build/lanbao_monitor"
+LANBAO_BUILD_PATHS="./build/lanbao_interfaces:./build/lanbao_core:./build/lanbao_data:./build/lanbao_strategy:./build/lanbao_backtest:./build/lanbao_risk:./build/lanbao_monitor"
 
 # 启动函数
 start_node() {
@@ -43,13 +43,13 @@ start_node() {
     # 创建启动脚本
     cat > "logs/${node_name}_launcher.sh" << EOF
 #!/bin/bash
+cd "\$(dirname "\$0")/.."
 source /opt/ros/humble/setup.bash
-source /data/wangf/lanbao_ws/install/setup.bash
+source ./install/setup.bash
 export PYTHONPATH="${ROS_PYTHONPATH}:${LANBAO_INSTALL_PATHS}:${LANBAO_BUILD_PATHS}"
-export LD_LIBRARY_PATH=/data/wangf/lanbao_ws/install/lanbao_interfaces/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib:/usr/local/lib
+export LD_LIBRARY_PATH=./install/lanbao_interfaces/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib:/usr/local/lib
 export PATH=/opt/ros/humble/bin:\$PATH
-cd /data/wangf/lanbao_ws
-/data/wangf/lanbao_ws/.venv/bin/python -m ${module} 2>&1
+./.venv/bin/python -m ${module} 2>&1
 EOF
     chmod +x "logs/${node_name}_launcher.sh"
     

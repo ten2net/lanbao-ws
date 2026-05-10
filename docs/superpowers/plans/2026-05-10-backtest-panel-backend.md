@@ -719,6 +719,7 @@ from loguru import logger
 
 from .ros2_client import get_ros2_manager
 from .routes import backtests, strategies
+from .services.storage import storage
 from .websocket import progress_bridge
 
 
@@ -730,11 +731,73 @@ async def lifespan(app: FastAPI):
     manager = get_ros2_manager()
     manager.connect()
 
+    # 注册 Topic 订阅器（回测结果自动持久化）
+    _setup_topic_subscriber(manager)
+
     yield
 
     # 关闭时
     logger.info("FastAPI 关闭，断开 ROS2 连接...")
     manager.disconnect()
+
+
+def _setup_topic_subscriber(manager):
+    """设置 /backtest/result Topic 订阅器"""
+    try:
+        from rclpy.qos import QoSProfile
+        from lanbao_interfaces.msg import BacktestResult as BacktestResultMsg
+
+        def on_result(msg):
+            """接收回测结果并持久化到 JSON"""
+            try:
+                from datetime import datetime
+
+                # 构造 v2.0 主文件数据
+                data = {
+                    "schema_version": "2.0",
+                    "backtest_id": msg.backtest_id,
+                    "meta": {
+                        "strategy_id": msg.strategy_id,
+                        "strategy_name": msg.strategy_id,
+                        "symbol": msg.symbol,
+                        "start_date": msg.start_date,
+                        "end_date": msg.end_date,
+                        "status": msg.status.lower(),
+                        "created_at": datetime.now().isoformat(),
+                    },
+                    "performance": {
+                        "returns": {
+                            "total_return_pct": round(msg.total_return * 100, 2),
+                            "annual_return_pct": round(msg.annual_return * 100, 2),
+                        },
+                        "risk": {
+                            "sharpe_ratio": round(msg.sharpe_ratio, 2),
+                            "max_drawdown_pct": round(msg.max_drawdown * 100, 2),
+                            "volatility_annual_pct": round(msg.volatility * 100, 2),
+                        },
+                        "trades": {
+                            "total_count": msg.total_trades,
+                            "win_rate_pct": round(msg.win_rate * 100, 2),
+                            "profit_factor": round(msg.profit_factor, 2),
+                        },
+                    },
+                    "files": {},
+                }
+                storage.save_backtest(msg.backtest_id, data)
+                logger.info(f"Topic 自动持久化回测结果: {msg.backtest_id}")
+            except Exception as e:
+                logger.error(f"Topic 持久化回测结果失败: {e}")
+
+        manager.node.create_subscription(
+            BacktestResultMsg,
+            '/backtest/result',
+            on_result,
+            qos_profile=QoSProfile(depth=10)
+        )
+        logger.info("已订阅 /backtest/result Topic")
+
+    except Exception as e:
+        logger.error(f"注册 Topic 订阅器失败: {e}")
 
 
 app = FastAPI(
@@ -886,6 +949,7 @@ from ..models import (
     EquityPoint,
     EquityResponse,
     MonthlyResponse,
+    RunBacktestRequest,
     TradesResponse,
     TradeItem,
 )
@@ -959,8 +1023,9 @@ async def list_backtests(
     sort_field = sort.lstrip("-")
 
     def _sort_key(r):
+        m = r.get("meta", r)
         if sort_field == "created_at":
-            return meta.get("created_at", "")
+            return m.get("created_at", "")
         perf = r.get("performance", {})
         if sort_field == "total_return":
             return perf.get("returns", {}).get("total_return_pct", 0)
@@ -1188,27 +1253,21 @@ async def _run_backtest_service(request: RunBacktestRequest):
             request.params.get("initial_capital", 100000)
         )
 
-        # 调用
+        # 调用 — rclpy.Future 需用 asyncio.Event 桥接等待
         future = client.call_async(srv_request)
-        import rclpy
-        from rclpy.task import Future
-
-        # 使用 spin_until_future_complete 的异步包装
-        done = False
+        event = asyncio.Event()
         result = None
 
         def _done_callback(fut):
-            nonlocal done, result
+            nonlocal result
             result = fut.result()
-            done = True
+            event.set()
 
         future.add_done_callback(_done_callback)
 
-        for _ in range(600):  # 60秒超时
-            if done:
-                break
-            await asyncio.sleep(0.1)
-        else:
+        try:
+            await asyncio.wait_for(event.wait(), timeout=60.0)
+        except asyncio.TimeoutError:
             raise HTTPException(status_code=504, detail="回测服务调用超时")
 
         if result is None:
@@ -1229,18 +1288,13 @@ async def _run_backtest_service(request: RunBacktestRequest):
 
 
 async def _run_backtest_action(request: RunBacktestRequest):
-    """通过 ROS2 Action 执行长时间回测，返回 WebSocket URL"""
-    import uuid
+    """通过 ROS2 Action 执行长时间回测 — V1 暂不实现，降级为 Service 调用
 
-    task_id = f"task_{uuid.uuid4().hex[:8]}"
-
-    # 返回任务ID和 WebSocket URL，前端连接 WebSocket 接收进度
-    return {
-        "task_id": task_id,
-        "status": "queued",
-        "message": "回测已加入队列",
-        "ws_url": f"/api/v1/ws/backtest/{task_id}",
-    }
+    注: Action 模式需要完整的 Goal/Feeback/Result 处理 + WebSocket 桥接。
+    V1 版本统一使用 Service 模式，后续迭代再引入 Action 的异步进度推送。
+    """
+    # 降级为 Service 调用
+    return await _run_backtest_service(request)
 
 
 @router.websocket("/ws/backtest/{task_id}")

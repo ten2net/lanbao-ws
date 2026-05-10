@@ -322,13 +322,10 @@ class BacktestEngineNode(LanBaoBaseNode):
             return ma_cross_signal
     
     def _save_backtest_result(self, result):
-        """保存回测结果到 JSON 文件和 HTML 报告"""
+        """保存回测结果到 v2.0 JSON 文件"""
         import json
         import os
 
-        # 优先使用环境变量，其次是项目根目录下的 reports/
-        # backtest_engine_node.py 位于 src/lanbao_backtest/lanbao_backtest/ 下
-        # 需要向上回退 4 层到达项目根目录
         project_root = os.path.dirname(os.path.dirname(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         ))
@@ -337,41 +334,191 @@ class BacktestEngineNode(LanBaoBaseNode):
         reports_dir = os.path.expanduser(reports_dir)
         os.makedirs(reports_dir, exist_ok=True)
 
-        # 1) 保存 JSON（核心数据，必须成功）
+        backtest_id = result.backtest_id
+
+        # 1) 主文件
         try:
-            result_dict = {
-                "backtest_id": result.backtest_id,
-                "strategy_name": result.strategy_id,
-                "symbol": result.symbol,
-                "start_date": result.start_date,
-                "end_date": result.end_date,
-                "total_return": round(result.total_return * 100, 2),
-                "annual_return": round(result.annual_return * 100, 2),
-                "sharpe_ratio": round(result.sharpe_ratio, 2) if result.sharpe_ratio is not None else 0.0,
-                "max_drawdown": round(result.max_drawdown * 100, 2),
-                "volatility": round(result.volatility * 100, 2) if result.volatility is not None else 0.0,
-                "win_rate": round(result.win_rate * 100, 2) if result.win_rate is not None else 0.0,
-                "trade_count": result.total_trades,
-                "profit_factor": round(result.profit_factor, 2) if result.profit_factor else None,
-                "timestamp": int(datetime.now().timestamp() * 1000),
+            perf = self._calculate_v2_performance(result)
+
+            main_data = {
+                "schema_version": "2.0",
+                "backtest_id": backtest_id,
+                "meta": {
+                    "strategy_id": result.strategy_id,
+                    "strategy_name": result.strategy_id,
+                    "strategy_params": {},
+                    "symbol": result.symbol,
+                    "start_date": result.start_date,
+                    "end_date": result.end_date,
+                    "total_trading_days": len(result.equity_curve),
+                    "created_at": datetime.now().isoformat(),
+                    "duration_seconds": 0,
+                    "status": "completed",
+                    "tags": [],
+                },
+                "performance": perf,
+                "files": {
+                    "equity": f"{backtest_id}.equity.json",
+                    "trades": f"{backtest_id}.trades.json",
+                    "monthly": f"{backtest_id}.monthly.json",
+                },
             }
 
-            json_path = os.path.join(reports_dir, f"{result.backtest_id}.json")
-            with open(json_path, "w", encoding="utf-8") as f:
-                json.dump(result_dict, f, ensure_ascii=False, indent=2)
-            logger.info(f"回测结果已保存: {json_path}")
-        except Exception as e:
-            logger.error(f"保存回测 JSON 失败: {e}")
+            with open(os.path.join(reports_dir, f"{backtest_id}.json"), "w", encoding="utf-8") as f:
+                json.dump(main_data, f, ensure_ascii=False, indent=2)
+            logger.info(f"回测主文件已保存: {backtest_id}.json")
 
-        # 2) 保存 HTML 报告（辅助展示，失败不影响 JSON）
-        try:
-            html = self._analyzer.generate_report_html(result)
-            html_path = os.path.join(reports_dir, f"{result.backtest_id}.html")
-            with open(html_path, "w", encoding="utf-8") as f:
-                f.write(html)
-            logger.info(f"回测报告已保存: {html_path}")
         except Exception as e:
-            logger.error(f"保存回测 HTML 失败: {e}")
+            logger.error(f"保存回测主文件失败: {e}")
+
+        # 2) 权益曲线
+        try:
+            equity_data = {"backtest_id": backtest_id, "series": []}
+            if len(result.equity_curve) > 0:
+                cummax = result.equity_curve.cummax()
+                drawdown = (result.equity_curve - cummax) / cummax
+                daily_returns = result.equity_curve.pct_change().fillna(0)
+
+                for date, equity in result.equity_curve.items():
+                    date_str = date.strftime("%Y-%m-%d") if hasattr(date, "strftime") else str(date)
+                    dd = drawdown.get(date, 0)
+                    dr = daily_returns.get(date, 0)
+                    equity_data["series"].append({
+                        "date": date_str,
+                        "equity": round(float(equity), 2),
+                        "drawdown_pct": round(float(dd) * 100, 2),
+                        "daily_return_pct": round(float(dr) * 100, 2),
+                    })
+
+            with open(os.path.join(reports_dir, f"{backtest_id}.equity.json"), "w", encoding="utf-8") as f:
+                json.dump(equity_data, f, ensure_ascii=False, indent=2)
+            logger.info(f"权益曲线已保存: {backtest_id}.equity.json")
+
+        except Exception as e:
+            logger.error(f"保存权益曲线失败: {e}")
+
+        # 3) 交易明细
+        try:
+            trades_data = {"backtest_id": backtest_id, "trades": []}
+            for t in result.trades:
+                trades_data["trades"].append({
+                    "trade_id": t.trade_id,
+                    "trade_date": t.trade_date.strftime("%Y-%m-%d") if hasattr(t.trade_date, "strftime") else str(t.trade_date),
+                    "action": t.action,
+                    "quantity": t.quantity,
+                    "price": round(t.price, 4),
+                    "amount": round(t.amount, 2),
+                    "commission": round(t.commission, 4),
+                    "pnl": round(t.pnl, 2) if t.pnl else None,
+                })
+
+            with open(os.path.join(reports_dir, f"{backtest_id}.trades.json"), "w", encoding="utf-8") as f:
+                json.dump(trades_data, f, ensure_ascii=False, indent=2)
+            logger.info(f"交易明细已保存: {backtest_id}.trades.json")
+
+        except Exception as e:
+            logger.error(f"保存交易明细失败: {e}")
+
+        # 4) 月度收益
+        try:
+            monthly_data = {"backtest_id": backtest_id, "matrix": {}}
+            if len(result.equity_curve) > 0:
+                monthly = result.equity_curve.resample('ME').last().pct_change().dropna()
+                for date, value in monthly.items():
+                    year = str(date.year)
+                    month = f"{date.month:02d}"
+                    if year not in monthly_data["matrix"]:
+                        monthly_data["matrix"][year] = {}
+                    monthly_data["matrix"][year][month] = round(float(value) * 100, 2)
+
+            with open(os.path.join(reports_dir, f"{backtest_id}.monthly.json"), "w", encoding="utf-8") as f:
+                json.dump(monthly_data, f, ensure_ascii=False, indent=2)
+            logger.info(f"月度收益已保存: {backtest_id}.monthly.json")
+
+        except Exception as e:
+            logger.error(f"保存月度收益失败: {e}")
+
+    def _calculate_v2_performance(self, result):
+        """计算 v2.0 绩效指标"""
+        equity = result.equity_curve
+        initial_capital = self._config.initial_capital
+        daily_returns = equity.pct_change().dropna()
+
+        total_return = (equity.iloc[-1] - initial_capital) / initial_capital if len(equity) > 0 else 0
+        days = len(equity)
+        annual_return = (1 + total_return) ** (252 / days) - 1 if days > 1 else 0
+        volatility = daily_returns.std() * np.sqrt(252) if len(daily_returns) > 0 else 0
+        sharpe = (annual_return - 0.03) / volatility if volatility > 0 else 0
+
+        cummax = equity.cummax()
+        drawdown = (equity - cummax) / cummax
+        max_dd = drawdown.min()
+
+        in_drawdown = drawdown < 0
+        max_dd_duration = 0
+        current_duration = 0
+        for v in in_drawdown:
+            if v:
+                current_duration += 1
+                max_dd_duration = max(max_dd_duration, current_duration)
+            else:
+                current_duration = 0
+
+        sell_trades = [t for t in result.trades if t.action == "SELL"]
+        wins = sum(1 for t in sell_trades if t.pnl > 0)
+        losses = sum(1 for t in sell_trades if t.pnl <= 0)
+        win_rate = wins / len(sell_trades) if sell_trades else 0
+        profit_factor = 0
+        if sell_trades:
+            gross_profit = sum(t.pnl for t in sell_trades if t.pnl > 0)
+            gross_loss = abs(sum(t.pnl for t in sell_trades if t.pnl < 0))
+            profit_factor = gross_profit / gross_loss if gross_loss > 0 else 0
+
+        holding_days = []
+        buy_date = None
+        for t in result.trades:
+            if t.action == "BUY":
+                buy_date = t.trade_date
+            elif t.action == "SELL" and buy_date:
+                if hasattr(t.trade_date, "__sub__"):
+                    holding_days.append((t.trade_date - buy_date).days)
+                buy_date = None
+        avg_holding = np.mean(holding_days) if holding_days else 0
+
+        return {
+            "returns": {
+                "total_return_pct": round(total_return * 100, 2),
+                "annual_return_pct": round(annual_return * 100, 2),
+                "daily_return_mean_pct": round(daily_returns.mean() * 100, 2) if len(daily_returns) > 0 else 0,
+                "daily_return_std_pct": round(daily_returns.std() * 100, 2) if len(daily_returns) > 0 else 0,
+                "best_day_pct": round(daily_returns.max() * 100, 2) if len(daily_returns) > 0 else 0,
+                "worst_day_pct": round(daily_returns.min() * 100, 2) if len(daily_returns) > 0 else 0,
+                "positive_days": int((daily_returns > 0).sum()),
+                "negative_days": int((daily_returns < 0).sum()),
+            },
+            "risk": {
+                "sharpe_ratio": round(sharpe, 2),
+                "sortino_ratio": round(sharpe, 2),
+                "max_drawdown_pct": round(max_dd * 100, 2),
+                "max_drawdown_duration_days": max_dd_duration,
+                "volatility_annual_pct": round(volatility * 100, 2),
+                "var_95_pct": round(np.percentile(daily_returns, 5) * 100, 2) if len(daily_returns) > 0 else 0,
+                "calmar_ratio": round(annual_return / abs(max_dd), 2) if max_dd != 0 else 0,
+            },
+            "trades": {
+                "total_count": len(result.trades),
+                "winning_count": wins,
+                "losing_count": losses,
+                "win_rate_pct": round(win_rate * 100, 2),
+                "profit_factor": round(profit_factor, 2),
+                "avg_trade_return_pct": round(np.mean([t.pnl for t in sell_trades]) / initial_capital * 100, 2) if sell_trades else 0,
+                "avg_win_pct": round(np.mean([t.pnl for t in sell_trades if t.pnl > 0]) / initial_capital * 100, 2) if any(t.pnl > 0 for t in sell_trades) else 0,
+                "avg_loss_pct": round(np.mean([t.pnl for t in sell_trades if t.pnl <= 0]) / initial_capital * 100, 2) if any(t.pnl <= 0 for t in sell_trades) else 0,
+                "largest_win_pct": round(max((t.pnl for t in sell_trades if t.pnl > 0), default=0) / initial_capital * 100, 2),
+                "largest_loss_pct": round(min((t.pnl for t in sell_trades if t.pnl <= 0), default=0) / initial_capital * 100, 2),
+                "avg_holding_days": round(avg_holding, 1),
+            },
+        }
     
     def _publish_result(self, result):
         """发布回测结果"""

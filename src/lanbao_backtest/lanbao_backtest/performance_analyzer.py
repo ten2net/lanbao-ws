@@ -226,9 +226,9 @@ class PerformanceAnalyzer:
             <table>
                 <tr><th>指标</th><th>数值</th></tr>
                 <tr><td>最大回撤</td><td class="negative">{analysis['summary']['max_drawdown']}</td></tr>
-                <tr><td>波动率</td><td>{analysis['risk']['volatility']:.2%}</td></tr>
+                <tr><td>波动率</td><td>{analysis.get('risk', {}).get('volatility', 0):.2%}</td></tr>
             </table>
-            
+
             <h2>交易统计</h2>
             <table>
                 <tr><th>指标</th><th>数值</th></tr>

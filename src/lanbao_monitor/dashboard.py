@@ -12,6 +12,7 @@ import json
 import os
 import subprocess
 import sys
+import psutil
 from datetime import datetime
 
 # 页面配置
@@ -122,6 +123,55 @@ def _format_timestamp(ts_ms):
         return str(ts_ms)
 
 
+def load_system_metrics_history(max_points: int = 60):
+    """加载系统 CPU/内存 历史使用率，通过 session_state 维护时间序列
+
+    Args:
+        max_points: 最多保留的数据点数量
+
+    Returns:
+        (cpu_df, mem_df) 两个 DataFrame，包含真实历史数据
+    """
+    # 初始化 session_state
+    if "sys_metrics_history" not in st.session_state:
+        st.session_state.sys_metrics_history = {
+            "timestamps": [],
+            "cpu_values": [],
+            "mem_values": [],
+        }
+
+    history = st.session_state.sys_metrics_history
+
+    # 获取当前真实系统指标
+    try:
+        cpu_percent = psutil.cpu_percent(interval=None)
+        mem_percent = psutil.virtual_memory().percent
+    except Exception:
+        cpu_percent = 0.0
+        mem_percent = 0.0
+
+    now = datetime.now()
+    history["timestamps"].append(now)
+    history["cpu_values"].append(cpu_percent)
+    history["mem_values"].append(mem_percent)
+
+    # 滚动窗口：只保留最近 max_points 个数据点
+    if len(history["timestamps"]) > max_points:
+        history["timestamps"] = history["timestamps"][-max_points:]
+        history["cpu_values"] = history["cpu_values"][-max_points:]
+        history["mem_values"] = history["mem_values"][-max_points:]
+
+    cpu_df = pd.DataFrame({
+        "时间": history["timestamps"],
+        "使用率": history["cpu_values"],
+    })
+    mem_df = pd.DataFrame({
+        "时间": history["timestamps"],
+        "使用率": history["mem_values"],
+    })
+    return cpu_df, mem_df
+
+
 def load_node_status():
     """从 ROS2 服务加载真实节点状态"""
     data = _run_ros2_client("nodes")
@@ -174,19 +224,35 @@ def load_alerts():
 
 
 def load_backtest_results():
-    """加载回测结果"""
+    """加载回测结果 — 从项目根目录的 reports/ 文件夹读取"""
     results = []
-    # 尝试多个可能的路径
-    for reports_dir in ["./reports", "/workspace/reports"]:
-        if os.path.exists(reports_dir):
-            for file in os.listdir(reports_dir):
-                if file.endswith(".json"):
-                    try:
-                        with open(os.path.join(reports_dir, file), "r") as f:
-                            results.append(json.load(f))
-                    except Exception:
-                        pass
-    return results
+    debug_info = []
+    # 基于项目根目录的绝对路径，避免工作目录不一致导致找不到文件
+    project_root = _get_project_root()
+    reports_dirs = [
+        os.path.join(project_root, "reports"),
+        os.environ.get("LANBAO_REPORTS_DIR", ""),
+        "./reports",
+        "/workspace/reports",
+    ]
+    for reports_dir in reports_dirs:
+        if not reports_dir:
+            continue
+        reports_dir = os.path.expanduser(reports_dir)
+        debug_info.append(f"检查目录: {reports_dir}")
+        if os.path.exists(reports_dir) and os.path.isdir(reports_dir):
+            files = [f for f in os.listdir(reports_dir) if f.endswith(".json")]
+            debug_info.append(f"  -> 找到 {len(files)} 个 JSON 文件: {files}")
+            for file in sorted(files, reverse=True):
+                try:
+                    filepath = os.path.join(reports_dir, file)
+                    with open(filepath, "r", encoding="utf-8") as f:
+                        results.append(json.load(f))
+                except Exception as e:
+                    debug_info.append(f"  -> 读取失败 {file}: {e}")
+        else:
+            debug_info.append(f"  -> 目录不存在")
+    return results, debug_info
 
 
 def get_status_color_class(status):
@@ -316,45 +382,225 @@ def show_overview():
     else:
         st.warning("未获取到节点状态数据。请确保 monitor_node 已启动，且 ROS2 环境已正确配置。")
 
-    # 系统资源使用（模拟数据，后续可从 MonitorNode 导出）
+    # 系统资源使用 — 真实数据
+    cpu_df, mem_df = load_system_metrics_history()
     col1, col2 = st.columns(2)
 
     with col1:
         st.subheader("CPU 使用率")
-        cpu_data = pd.DataFrame({
-            '时间': pd.date_range(start='2024-01-01', periods=24, freq='h'),
-            '使用率': np.random.uniform(20, 60, 24)
-        })
-        fig = go.Figure(go.Scatter(
-            x=cpu_data['时间'],
-            y=cpu_data['使用率'],
-            fill='tozeroy',
-            line=dict(color='#1f77b4')
-        ))
-        fig.update_layout(height=250, margin=dict(l=20, r=20, t=20, b=20))
-        st.plotly_chart(fig, key="cpu_chart", use_container_width=True)
+        if len(cpu_df) > 1:
+            fig = go.Figure(go.Scatter(
+                x=cpu_df['时间'],
+                y=cpu_df['使用率'],
+                fill='tozeroy',
+                line=dict(color='#1f77b4'),
+                hovertemplate='时间: %{x|%H:%M:%S}<br>CPU: %{y:.1f}%<extra></extra>',
+            ))
+            fig.update_layout(
+                height=250,
+                margin=dict(l=20, r=20, t=20, b=20),
+                yaxis=dict(range=[0, 100], title='使用率 (%)'),
+                xaxis_title=None,
+            )
+            st.plotly_chart(fig, key="cpu_chart", use_container_width=True)
+        else:
+            st.info("刷新页面以收集 CPU 历史数据")
 
     with col2:
         st.subheader("内存 使用率")
-        mem_data = pd.DataFrame({
-            '时间': pd.date_range(start='2024-01-01', periods=24, freq='h'),
-            '使用率': np.random.uniform(40, 70, 24)
-        })
-        fig = go.Figure(go.Scatter(
-            x=mem_data['时间'],
-            y=mem_data['使用率'],
-            fill='tozeroy',
-            line=dict(color='#ff7f0e')
-        ))
-        fig.update_layout(height=250, margin=dict(l=20, r=20, t=20, b=20))
-        st.plotly_chart(fig, key="mem_chart", use_container_width=True)
+        if len(mem_df) > 1:
+            fig = go.Figure(go.Scatter(
+                x=mem_df['时间'],
+                y=mem_df['使用率'],
+                fill='tozeroy',
+                line=dict(color='#ff7f0e'),
+                hovertemplate='时间: %{x|%H:%M:%S}<br>内存: %{y:.1f}%<extra></extra>',
+            ))
+            fig.update_layout(
+                height=250,
+                margin=dict(l=20, r=20, t=20, b=20),
+                yaxis=dict(range=[0, 100], title='使用率 (%)'),
+                xaxis_title=None,
+            )
+            st.plotly_chart(fig, key="mem_chart", use_container_width=True)
+        else:
+            st.info("刷新页面以收集内存历史数据")
+
+
+def _run_backtest_ros2(strategy_id: str, symbol: str, start_date: str, end_date: str):
+    """通过 ROS2 服务调用运行回测
+
+    Returns:
+        dict: {success, backtest_id, message, stdout, stderr, returncode}
+    """
+    project_root = _get_project_root()
+    env = os.environ.copy()
+    pp = env.get("PYTHONPATH", "")
+    ros_pp = "/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages"
+    project_pp = ":".join([
+        f"{project_root}/src/lanbao_backtest",
+        f"{project_root}/install/lanbao_interfaces/lib/python3.10/site-packages",
+        f"{project_root}/install/lanbao_core/lib/python3.10/site-packages",
+        f"{project_root}/build/lanbao_interfaces",
+        f"{project_root}/build/lanbao_core",
+    ])
+    env["PYTHONPATH"] = f"{project_pp}:{ros_pp}:{pp}" if pp else f"{project_pp}:{ros_pp}"
+
+    ld = env.get("LD_LIBRARY_PATH", "")
+    ros_ld = "/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib"
+    project_ld = f"{project_root}/install/lanbao_interfaces/lib"
+    env["LD_LIBRARY_PATH"] = f"{project_ld}:{ros_ld}:{ld}" if ld else f"{project_ld}:{ros_ld}"
+
+    script = os.path.join(project_root, "src", "lanbao_backtest", "lanbao_backtest", "backtest_cli.py")
+    if not os.path.exists(script):
+        return {
+            "success": False,
+            "message": f"backtest_cli.py 不存在: {script}",
+            "stdout": "", "stderr": "", "returncode": -1
+        }
+
+    try:
+        result = subprocess.run(
+            [sys.executable, script, strategy_id, symbol, start_date, end_date],
+            capture_output=True, text=True, timeout=120,
+            env=env, cwd=project_root
+        )
+        stdout = result.stdout.strip()
+        stderr = result.stderr.strip()
+
+        # 先尝试从 stdout 解析 JSON
+        if stdout:
+            try:
+                parsed = json.loads(stdout)
+                parsed["stdout"] = stdout
+                parsed["stderr"] = stderr
+                parsed["returncode"] = result.returncode
+                return parsed
+            except json.JSONDecodeError:
+                pass
+
+        # 如果 stdout 不是 JSON，构造错误响应
+        return {
+            "success": False,
+            "message": f"CLI 返回非 JSON 输出 (exit={result.returncode}): {stdout[:300]}",
+            "stdout": stdout,
+            "stderr": stderr,
+            "returncode": result.returncode,
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "message": "回测调用超时（超过120秒），请检查 backtest_engine_node 是否卡住",
+            "stdout": "", "stderr": "", "returncode": -1
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"回测调用异常: {str(e)}",
+            "stdout": "", "stderr": "", "returncode": -1
+        }
 
 
 def show_backtest_results():
-    """回测结果页面"""
+    """回测结果页面 — 展示真实回测数据，支持在线运行回测"""
     st.header("📈 回测结果分析")
 
-    results = load_backtest_results()
+    # ========== 在线回测执行区 ==========
+    with st.expander("▶️ 运行新回测", expanded=False):
+        st.subheader("配置回测参数")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            strategy = st.selectbox("策略", ["ma_cross", "rsi"], index=0)
+        with col2:
+            symbol = st.text_input("股票代码", value="000001.SZ")
+        with col3:
+            end = datetime.now()
+            start = end.replace(year=end.year - 1)
+            start_date = st.date_input("开始日期", value=start)
+            end_date = st.date_input("结束日期", value=end)
+
+        # 初始化 session state
+        if "backtest_state" not in st.session_state:
+            st.session_state.backtest_state = "idle"
+        if "backtest_result" not in st.session_state:
+            st.session_state.backtest_result = None
+
+        # 如果有已完成的回测结果，显示在表单下方
+        if st.session_state.backtest_state == "completed" and st.session_state.backtest_result:
+            r = st.session_state.backtest_result
+            st.success(f"✅ 回测完成！ID: {r.get('backtest_id')}")
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.write(f"**策略**: {r.get('strategy_id', strategy)}")
+                st.write(f"**标的**: {symbol}")
+            with col_b:
+                st.write(f"**消息**: {r.get('message', '')}")
+            if st.button("🔄 清除并运行新回测"):
+                st.session_state.backtest_state = "idle"
+                st.session_state.backtest_result = None
+                st.rerun()
+
+        elif st.session_state.backtest_state == "failed" and st.session_state.backtest_result:
+            r = st.session_state.backtest_result
+            st.error(f"❌ 回测失败: {r.get('message', '未知错误')}")
+            with st.expander("查看调试信息"):
+                st.text(f"returncode: {r.get('returncode')}")
+                if r.get('stdout'):
+                    st.text("STDOUT:")
+                    st.code(r['stdout'])
+                if r.get('stderr'):
+                    st.text("STDERR:")
+                    st.code(r['stderr'])
+            st.info("请确保以下节点已启动: backtest_engine_node, market_data_node")
+            if st.button("🔄 重试"):
+                st.session_state.backtest_state = "idle"
+                st.session_state.backtest_result = None
+                st.rerun()
+
+        # 启动按钮
+        if st.session_state.backtest_state in ("idle", "failed"):
+            if st.button("🚀 启动回测", type="primary"):
+                st.session_state.backtest_state = "running"
+                st.session_state.backtest_result = None
+                st.rerun()
+
+        # 执行回测（在单独的 status 容器中显示进度）
+        if st.session_state.backtest_state == "running":
+            with st.status("⏳ 回测执行中...", expanded=True) as status:
+                st.write("1️⃣ 初始化 ROS2 客户端...")
+                st.write("2️⃣ 连接 backtest/run 服务...")
+                st.write("3️⃣ 请求获取历史行情数据...")
+                st.write("4️⃣ 执行回测计算（可能耗时较长）...")
+                st.write("5️⃣ 保存结果...")
+
+                result = _run_backtest_ros2(
+                    strategy,
+                    symbol,
+                    start_date.strftime("%Y%m%d"),
+                    end_date.strftime("%Y%m%d")
+                )
+
+                st.session_state.backtest_result = result
+
+                if result.get("success"):
+                    st.session_state.backtest_state = "completed"
+                    status.update(label="✅ 回测完成！", state="complete", expanded=False)
+                    st.rerun()
+                else:
+                    st.session_state.backtest_state = "failed"
+                    status.update(label=f"❌ 回测失败", state="error", expanded=True)
+                    st.rerun()
+
+    st.markdown("---")
+
+    # ========== 回测结果列表 ==========
+    results, debug_info = load_backtest_results()
+
+    with st.expander("🔍 诊断信息"):
+        st.write("**回测结果加载诊断**")
+        for line in debug_info:
+            st.text(line)
+        st.write(f"**加载到的记录数**: {len(results)}")
 
     if results:
         # 从真实 JSON 数据构建 DataFrame
@@ -362,86 +608,124 @@ def show_backtest_results():
         for r in results:
             df_data.append({
                 "回测ID": r.get("backtest_id", "—"),
-                "策略名称": r.get("strategy_name", "—"),
-                "总收益": r.get("total_return", "—"),
-                "年化收益": r.get("annual_return", "—"),
+                "策略名称": r.get("strategy_name", r.get("strategy_id", "—")),
+                "标的": r.get("symbol", "—"),
+                "总收益 (%)": r.get("total_return", "—"),
+                "年化收益 (%)": r.get("annual_return", "—"),
                 "夏普比率": r.get("sharpe_ratio", "—"),
-                "最大回撤": r.get("max_drawdown", "—"),
+                "最大回撤 (%)": r.get("max_drawdown", "—"),
                 "交易次数": r.get("trade_count", "—"),
-                "胜率": r.get("win_rate", "—"),
+                "胜率 (%)": r.get("win_rate", "—"),
             })
         st.dataframe(pd.DataFrame(df_data), use_container_width=True)
     else:
-        # 展示模拟数据作为 fallback
-        backtest_data = pd.DataFrame({
-            '回测ID': ['BT001', 'BT002', 'BT003', 'BT004', 'BT005'],
-            '策略名称': ['MA交叉', 'RSI策略', '布林带', 'MACD', '双均线'],
-            '总收益': [15.2, 8.5, -2.3, 12.1, 18.7],
-            '年化收益': [18.5, 10.2, -3.1, 14.8, 22.3],
-            '夏普比率': [1.45, 0.98, -0.25, 1.23, 1.67],
-            '最大回撤': [-8.5, -12.3, -15.2, -9.8, -7.2],
-            '交易次数': [45, 32, 28, 38, 52],
-            '胜率': [62.5, 58.3, 45.2, 60.5, 65.8]
-        })
-        st.dataframe(backtest_data, use_container_width=True)
-        st.info("未找到真实回测报告，展示示例数据。")
+        st.info("暂无回测报告。请通过上方 '▶️ 运行新回测' 执行回测，或使用命令行运行。")
 
     st.markdown("---")
 
-    # 收益对比图
+    # ========== 收益对比图（真实数据）==========
     st.subheader("策略收益对比")
 
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        name='总收益',
-        x=['MA交叉', 'RSI策略', '布林带', 'MACD', '双均线'],
-        y=[15.2, 8.5, -2.3, 12.1, 18.7],
-        marker_color='#1f77b4'
-    ))
-    fig.add_trace(go.Bar(
-        name='年化收益',
-        x=['MA交叉', 'RSI策略', '布林带', 'MACD', '双均线'],
-        y=[18.5, 10.2, -3.1, 14.8, 22.3],
-        marker_color='#ff7f0e'
-    ))
+    if results:
+        names = [r.get("strategy_name", r.get("strategy_id", "—")) for r in results]
+        total_returns = [r.get("total_return", 0) for r in results]
+        annual_returns = [r.get("annual_return", 0) for r in results]
 
-    fig.update_layout(
-        barmode='group',
-        height=400,
-        yaxis_title='收益率 (%)',
-        xaxis_title='策略'
-    )
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            name='总收益',
+            x=names,
+            y=total_returns,
+            marker_color='#1f77b4'
+        ))
+        fig.add_trace(go.Bar(
+            name='年化收益',
+            x=names,
+            y=annual_returns,
+            marker_color='#ff7f0e'
+        ))
 
-    st.plotly_chart(fig, key="returns_chart", use_container_width=True)
+        fig.update_layout(
+            barmode='group',
+            height=400,
+            yaxis_title='收益率 (%)',
+            xaxis_title='策略'
+        )
 
-    # 风险收益散点图
+        st.plotly_chart(fig, key="returns_chart", use_container_width=True)
+    else:
+        st.info("📊 暂无回测数据，运行回测后将在此显示策略收益对比图。")
+
+    st.markdown("---")
+
+    # ========== 风险收益散点图（真实数据）==========
     st.subheader("风险-收益分析")
 
-    marker_sizes = np.abs([1.45, 0.98, -0.25, 1.23, 1.67]) * 10
+    if results:
+        names = [r.get("strategy_name", r.get("strategy_id", "—")) for r in results]
+        annual_returns = [r.get("annual_return", 0) for r in results]
+        drawdowns = [abs(r.get("max_drawdown", 0)) for r in results]
+        sharpe_values = [r.get("sharpe_ratio", 0) for r in results]
+        marker_sizes = [abs(s) * 10 + 5 for s in sharpe_values]
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=[8.5, 12.3, 15.2, 9.8, 7.2],
-        y=[18.5, 10.2, -3.1, 14.8, 22.3],
-        mode='markers+text',
-        text=['MA交叉', 'RSI策略', '布林带', 'MACD', '双均线'],
-        textposition='top center',
-        marker=dict(
-            size=marker_sizes,
-            color=[1.45, 0.98, -0.25, 1.23, 1.67],
-            colorscale='Viridis',
-            showscale=True,
-            colorbar=dict(title='夏普比率')
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=drawdowns,
+            y=annual_returns,
+            mode='markers+text',
+            text=names,
+            textposition='top center',
+            hovertemplate='策略: %{text}<br>最大回撤: %{x:.2f}%<br>年化收益: %{y:.2f}%<extra></extra>',
+            marker=dict(
+                size=marker_sizes,
+                color=sharpe_values,
+                colorscale='Viridis',
+                showscale=True,
+                colorbar=dict(title='夏普比率')
+            )
+        ))
+
+        fig.update_layout(
+            height=400,
+            xaxis_title='最大回撤 (%)',
+            yaxis_title='年化收益 (%)'
         )
-    ))
 
-    fig.update_layout(
-        height=400,
-        xaxis_title='最大回撤 (%)',
-        yaxis_title='年化收益 (%)'
-    )
+        st.plotly_chart(fig, key="risk_return_chart", use_container_width=True)
+    else:
+        st.info("📈 暂无回测数据，运行回测后将在此显示风险-收益散点图。")
 
-    st.plotly_chart(fig, key="risk_return_chart", use_container_width=True)
+    st.markdown("---")
+
+    # ========== 单个回测详情展开 ==========
+    st.subheader("回测详情")
+
+    if results:
+        project_root = _get_project_root()
+        for r in results:
+            strategy_display = r.get('strategy_name', r.get('strategy_id', '—'))
+            with st.expander(f"📄 {r.get('backtest_id', '—')} — {strategy_display} ({r.get('symbol', '—')})"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write(f"**回测周期**: {r.get('start_date', '—')} ~ {r.get('end_date', '—')}")
+                    st.write(f"**总收益**: {r.get('total_return', '—')} %")
+                    st.write(f"**年化收益**: {r.get('annual_return', '—')} %")
+                    st.write(f"**夏普比率**: {r.get('sharpe_ratio', '—')}")
+                with col2:
+                    st.write(f"**最大回撤**: {r.get('max_drawdown', '—')} %")
+                    st.write(f"**波动率**: {r.get('volatility', '—')} %")
+                    st.write(f"**交易次数**: {r.get('trade_count', '—')}")
+                    st.write(f"**胜率**: {r.get('win_rate', '—')} %")
+
+                html_file = os.path.join(project_root, "reports", f"{r.get('backtest_id')}.html")
+                if os.path.exists(html_file):
+                    with open(html_file, "r", encoding="utf-8") as f:
+                        html_content = f.read()
+                    st.components.v1.html(html_content, height=600, scrolling=True)
+                else:
+                    st.caption("HTML 报告文件未找到")
+    else:
+        st.info("📋 暂无回测详情，运行回测后将在此显示每条回测的详细报告。")
 
 
 def show_risk_monitor():

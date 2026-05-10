@@ -322,9 +322,56 @@ class BacktestEngineNode(LanBaoBaseNode):
             return ma_cross_signal
     
     def _save_backtest_result(self, result):
-        """保存回测结果"""
-        # 这里可以保存到数据库
-        logger.info(f"回测结果已缓存: {result.backtest_id}")
+        """保存回测结果到 JSON 文件和 HTML 报告"""
+        import json
+        import os
+
+        # 优先使用环境变量，其次是项目根目录下的 reports/
+        # backtest_engine_node.py 位于 src/lanbao_backtest/lanbao_backtest/ 下
+        # 需要向上回退 4 层到达项目根目录
+        project_root = os.path.dirname(os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        ))
+        default_dir = os.path.join(project_root, "reports")
+        reports_dir = os.environ.get("LANBAO_REPORTS_DIR", default_dir)
+        reports_dir = os.path.expanduser(reports_dir)
+        os.makedirs(reports_dir, exist_ok=True)
+
+        # 1) 保存 JSON（核心数据，必须成功）
+        try:
+            result_dict = {
+                "backtest_id": result.backtest_id,
+                "strategy_name": result.strategy_id,
+                "symbol": result.symbol,
+                "start_date": result.start_date,
+                "end_date": result.end_date,
+                "total_return": round(result.total_return * 100, 2),
+                "annual_return": round(result.annual_return * 100, 2),
+                "sharpe_ratio": round(result.sharpe_ratio, 2) if result.sharpe_ratio is not None else 0.0,
+                "max_drawdown": round(result.max_drawdown * 100, 2),
+                "volatility": round(result.volatility * 100, 2) if result.volatility is not None else 0.0,
+                "win_rate": round(result.win_rate * 100, 2) if result.win_rate is not None else 0.0,
+                "trade_count": result.total_trades,
+                "profit_factor": round(result.profit_factor, 2) if result.profit_factor else None,
+                "timestamp": int(datetime.now().timestamp() * 1000),
+            }
+
+            json_path = os.path.join(reports_dir, f"{result.backtest_id}.json")
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(result_dict, f, ensure_ascii=False, indent=2)
+            logger.info(f"回测结果已保存: {json_path}")
+        except Exception as e:
+            logger.error(f"保存回测 JSON 失败: {e}")
+
+        # 2) 保存 HTML 报告（辅助展示，失败不影响 JSON）
+        try:
+            html = self._analyzer.generate_report_html(result)
+            html_path = os.path.join(reports_dir, f"{result.backtest_id}.html")
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(html)
+            logger.info(f"回测报告已保存: {html_path}")
+        except Exception as e:
+            logger.error(f"保存回测 HTML 失败: {e}")
     
     def _publish_result(self, result):
         """发布回测结果"""

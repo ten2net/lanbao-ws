@@ -55,6 +55,8 @@ dependencies = [
     "tqdm>=4.66.0",
     "hatch>=1.16.3",
     "empy==3.3.4",
+    # 系统监控
+    "psutil>=5.9.0",
 ]
 
 [project.optional-dependencies]

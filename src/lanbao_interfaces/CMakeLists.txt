@@ -21,7 +21,10 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/MarketAssessment.msg"
   "msg/PositionAllocation.msg"
   "msg/SystemAlert.msg"
-  
+  "msg/DataStats.msg"
+  "msg/DataQualityItem.msg"
+  "msg/SyncStatusDetail.msg"
+
   # 服务定义
   "srv/GetMarketData.srv"
   "srv/ExecuteOrder.srv"
@@ -29,7 +32,10 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/ManageStrategy.srv"
   "srv/CheckRisk.srv"
   "srv/GetNodeStatus.srv"
-  
+  "srv/GetDataStats.srv"
+  "srv/GetDataQuality.srv"
+  "srv/GetSyncStatus.srv"
+
   # 动作定义
   "action/BacktestStrategy.action"
   "action/DeployStrategy.action"

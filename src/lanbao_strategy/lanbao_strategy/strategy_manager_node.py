@@ -37,14 +37,14 @@ class StrategyManagerNode(LanBaoBaseNode):
         self._manager = StrategyManager()
         self._factory = StrategyFactory()
         
-        # 状态发布
-        self._status_publisher = None
+        # 策略状态发布（注意：基类已创建 _status_publisher 用于 NodeStatus）
+        self._strategy_status_publisher = None
         
     def initialize(self) -> bool:
         """初始化节点"""
         try:
-            # 创建状态发布器
-            self._status_publisher = self.create_publisher(
+            # 创建策略状态发布器（与基类的 NodeStatus 发布器分离）
+            self._strategy_status_publisher = self.create_publisher(
                 StrategyStatus,
                 'strategy/status',
                 10
@@ -56,8 +56,8 @@ class StrategyManagerNode(LanBaoBaseNode):
             # 设置动作服务器
             self._setup_action_server()
             
-            # 状态更新定时器
-            self._status_timer = self.create_timer(
+            # 策略状态更新定时器
+            self._strategy_status_timer = self.create_timer(
                 5.0,
                 self._publish_strategies_status,
                 callback_group=self._callback_group
@@ -250,7 +250,7 @@ class StrategyManagerNode(LanBaoBaseNode):
                 info = strategy.get_info()
                 msg.performance = float(info.get('performance', 0))
                 
-                self._status_publisher.publish(msg)
+                self._strategy_status_publisher.publish(msg)
                 
         except Exception as e:
             logger.error(f"发布策略状态失败: {e}")

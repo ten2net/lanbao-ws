@@ -11,8 +11,8 @@ from datetime import datetime, timedelta
 import json
 
 from lanbao_core import DataProcessorNode, NodeConfig
-from lanbao_interfaces.msg import MarketData, SystemAlert
-from lanbao_interfaces.srv import GetMarketData
+from lanbao_interfaces.msg import MarketData, SystemAlert, DataStats, DataQualityItem, SyncStatusDetail
+from lanbao_interfaces.srv import GetMarketData, GetDataStats, GetDataQuality, GetSyncStatus
 
 from .tushare_adapter import TushareAdapter
 from .tdx_adapter import TDXAdapter
@@ -146,10 +146,154 @@ class MarketDataNode(DataProcessorNode):
             self._handle_get_market_data,
             callback_group=self._callback_group
         )
-        
+
+        # 数据监控服务
+        self._get_data_stats_service = self.create_service(
+            GetDataStats,
+            'data/stats',
+            self._handle_get_data_stats,
+            callback_group=self._callback_group
+        )
+        self._get_data_quality_service = self.create_service(
+            GetDataQuality,
+            'data/quality',
+            self._handle_get_data_quality,
+            callback_group=self._callback_group
+        )
+        self._get_sync_status_service = self.create_service(
+            GetSyncStatus,
+            'data/sync_status',
+            self._handle_get_sync_status,
+            callback_group=self._callback_group
+        )
+
         logger.info("市场数据服务已设置")
-    
-    def _get_data_from_source(self, symbol: str, start_date: Optional[str], 
+
+    def _handle_get_data_stats(self, request, response):
+        """处理获取数据概况请求"""
+        try:
+            db_path = self._node_config.parameters.get('db_path', './data/lanbao.duckdb')
+            if not os.path.exists(db_path):
+                response.success = False
+                return response
+
+            conn = self._storage._conn
+            # 总记录数
+            total_records = conn.execute("SELECT COUNT(*) FROM stock_daily").fetchone()[0]
+            # 股票数
+            total_symbols = conn.execute("SELECT COUNT(DISTINCT symbol) FROM stock_daily").fetchone()[0]
+            # 日期范围
+            date_range = conn.execute("SELECT MIN(date), MAX(date) FROM stock_daily").fetchone()
+            # 文件大小
+            db_size_mb = os.path.getsize(db_path) / (1024 * 1024)
+            # 交易所分布
+            exchanges = conn.execute(
+                "SELECT SUBSTR(symbol, 1, 2) as prefix, COUNT(DISTINCT symbol) as cnt "
+                "FROM stock_daily GROUP BY prefix ORDER BY cnt DESC"
+            ).fetchall()
+
+            exchange_names = []
+            exchange_counts = []
+            prefix_map = {'60': '上海主板', '68': '科创板', '00': '深圳主板', '30': '创业板', '92': '北交所'}
+            for prefix, cnt in exchanges:
+                exchange_names.append(prefix_map.get(prefix, prefix))
+                exchange_counts.append(cnt)
+
+            stats = DataStats()
+            stats.total_records = int(total_records)
+            stats.total_symbols = int(total_symbols)
+            stats.start_date = str(date_range[0]) if date_range[0] else ""
+            stats.end_date = str(date_range[1]) if date_range[1] else ""
+            stats.db_size_mb = round(db_size_mb, 2)
+            stats.exchange_names = exchange_names
+            stats.exchange_counts = exchange_counts
+
+            response.stats = stats
+            response.success = True
+
+        except Exception as e:
+            logger.error(f"获取数据概况失败: {e}")
+            response.success = False
+        return response
+
+    def _handle_get_data_quality(self, request, response):
+        """处理获取数据质量请求"""
+        try:
+            conn = self._storage._conn
+            total = conn.execute("SELECT COUNT(*) FROM stock_daily").fetchone()[0]
+            if total == 0:
+                response.success = True
+                response.items = []
+                return response
+
+            checks = [
+                ('空值检测', "SELECT COUNT(*) FROM stock_daily WHERE open IS NULL OR high IS NULL OR low IS NULL OR close IS NULL OR volume IS NULL", '个'),
+                ('零价格', "SELECT COUNT(*) FROM stock_daily WHERE open = 0 OR high = 0 OR low = 0 OR close = 0", '条'),
+                ('负价格', "SELECT COUNT(*) FROM stock_daily WHERE open < 0 OR high < 0 OR low < 0 OR close < 0", '条'),
+                ('high < low', "SELECT COUNT(*) FROM stock_daily WHERE high < low", '条'),
+                ('价格越界', "SELECT COUNT(*) FROM stock_daily WHERE close > high OR close < low", '条'),
+                ('重复记录', "SELECT COUNT(*) - COUNT(DISTINCT symbol || '_' || date) FROM stock_daily", '条'),
+                ('零成交量', "SELECT COUNT(*) FROM stock_daily WHERE volume = 0", '条'),
+                ('复权因子默认值', "SELECT COUNT(*) FROM stock_daily WHERE adj_factor = 1.0", '条'),
+            ]
+
+            items = []
+            for name, sql, unit in checks:
+                fail_count = conn.execute(sql).fetchone()[0]
+                item = DataQualityItem()
+                item.check_name = name
+                item.fail_count = int(fail_count)
+                item.pass_count = int(total - fail_count)
+                if fail_count == 0:
+                    item.status = "PASS"
+                    item.description = "全部通过"
+                elif name == '复权因子默认值':
+                    pct = fail_count / total * 100
+                    item.status = "WARNING" if pct < 10 else "FAIL"
+                    item.description = f"{fail_count} 条 ({pct:.1f}%)"
+                else:
+                    item.status = "FAIL"
+                    item.description = f"{fail_count} {unit}"
+                items.append(item)
+
+            response.items = items
+            response.success = True
+
+        except Exception as e:
+            logger.error(f"获取数据质量失败: {e}")
+            response.success = False
+        return response
+
+    def _handle_get_sync_status(self, request, response):
+        """处理获取同步状态请求"""
+        try:
+            conn = self._storage._conn
+            result = conn.execute("SELECT * FROM sync_status WHERE id = 1 LIMIT 1").fetchone()
+            if result:
+                detail = SyncStatusDetail()
+                # sync_status 列: id, last_sync_time, total_symbols, success_count, failed_count, status, message, created_at, updated_at
+                detail.status = str(result[5]) if result[5] else "unknown"
+                detail.last_sync_time = str(result[1]) if result[1] else ""
+                detail.total_symbols = int(result[2]) if result[2] else 0
+                detail.success_count = int(result[3]) if result[3] else 0
+                detail.failed_count = int(result[4]) if result[4] else 0
+                detail.duration_seconds = 0.0  # sync_status 表无此字段
+                detail.message = str(result[6]) if result[6] else ""
+                response.detail = detail
+                response.success = True
+            else:
+                response.success = True
+                detail = SyncStatusDetail()
+                detail.status = "unknown"
+                detail.message = "暂无同步记录"
+                response.detail = detail
+
+        except Exception as e:
+            logger.error(f"获取同步状态失败: {e}")
+            response.success = False
+        return response
+
+    def _get_data_from_source(self, symbol: str, start_date: Optional[str],
                                end_date: Optional[str]) -> pd.DataFrame:
         """
         从数据源获取数据，支持fallback机制

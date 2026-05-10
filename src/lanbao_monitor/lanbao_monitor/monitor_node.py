@@ -3,6 +3,8 @@
 """
 import rclpy
 import psutil
+import json
+import os
 from datetime import datetime
 from loguru import logger
 
@@ -34,7 +36,13 @@ class MonitorNode(LanBaoBaseNode):
         
         # 告警历史
         self._alerts: list = []
-        
+
+        # 告警持久化文件
+        self._alerts_file = os.path.expanduser(
+            os.environ.get('LANBAO_ALERTS_FILE', './data/alerts.json')
+        )
+        os.makedirs(os.path.dirname(self._alerts_file) or '.', exist_ok=True)
+
         # 订阅器
         self._status_subscription = None
         self._alert_subscription = None
@@ -94,62 +102,77 @@ class MonitorNode(LanBaoBaseNode):
             'status': msg.status,
             'cpu_usage': msg.cpu_usage,
             'memory_usage': msg.memory_usage,
+            'message_count': msg.message_count,
+            'last_error': msg.last_error,
             'timestamp': msg.timestamp
         }
     
     def _on_system_alert(self, msg: SystemAlert):
         """接收系统告警"""
-        self._alerts.append({
+        alert_entry = {
             'type': msg.alert_type,
             'component': msg.component,
             'message': msg.message,
             'timestamp': msg.timestamp
-        })
-        
+        }
+        self._alerts.append(alert_entry)
+
         # 限制历史记录大小
         if len(self._alerts) > 1000:
             self._alerts = self._alerts[-1000:]
-        
+
+        # 持久化到文件
+        self._persist_alerts()
+
         logger.warning(f"[系统告警] [{msg.alert_type}] {msg.component}: {msg.message}")
     
+    def _persist_alerts(self):
+        """将告警持久化到 JSON 文件"""
+        try:
+            with open(self._alerts_file, 'w', encoding='utf-8') as f:
+                json.dump(self._alerts, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error(f"告警持久化失败: {e}")
+
     def _handle_get_node_status(self, request, response):
         """
         处理获取节点状态请求
         """
         try:
             node_name = request.node_name
-            
+
+            def _build_status_msg(name, status):
+                msg = NodeStatus()
+                msg.node_name = name
+                msg.node_type = status['node_type']
+                msg.status = status['status']
+                msg.cpu_usage = status['cpu_usage']
+                msg.memory_usage = status['memory_usage']
+                msg.message_count = status['message_count']
+                msg.last_error = status['last_error']
+                msg.timestamp = status['timestamp']
+                return msg
+
             if node_name:
                 # 获取指定节点状态
                 status = self._node_statuses.get(node_name)
                 if status:
-                    msg = NodeStatus()
-                    msg.node_name = node_name
-                    msg.node_type = status['node_type']
-                    msg.status = status['status']
-                    msg.cpu_usage = status['cpu_usage']
-                    msg.memory_usage = status['memory_usage']
-                    response.statuses = [msg]
+                    response.statuses = [_build_status_msg(node_name, status)]
                 else:
                     response.statuses = []
             else:
                 # 获取所有节点状态
-                response.statuses = []
-                for name, status in self._node_statuses.items():
-                    msg = NodeStatus()
-                    msg.node_name = name
-                    msg.node_type = status['node_type']
-                    msg.status = status['status']
-                    msg.cpu_usage = status['cpu_usage']
-                    msg.memory_usage = status['memory_usage']
-                    response.statuses.append(msg)
-            
+                response.statuses = [
+                    _build_status_msg(name, status)
+                    for name, status in self._node_statuses.items()
+                ]
+
             response.success = True
-            
+
         except Exception as e:
             logger.error(f"获取节点状态失败: {e}")
             response.success = False
-        
+
         return response
     
     def _monitor_system(self):

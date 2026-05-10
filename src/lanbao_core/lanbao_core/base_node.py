@@ -67,7 +67,7 @@ class LanBaoBaseNode(ABC, Node):
         # 状态发布
         self._status_publisher = self.create_publisher(
             NodeStatus,
-            f'{node_name}/status',
+            '/node_status',
             self._qos_profiles['status']
         )
         

@@ -191,6 +191,19 @@ class QualityReport(BaseModel):
     overall_score: float
 
 
+class ColumnInfo(BaseModel):
+    name: str
+    type: str
+
+
+class TablePreviewResponse(BaseModel):
+    table: str
+    columns: List[ColumnInfo]
+    rows: List[List[Any]]
+    total: int
+    limit: int
+
+
 # ── 系统配置 ──
 
 class BacktestConfig(BaseModel):

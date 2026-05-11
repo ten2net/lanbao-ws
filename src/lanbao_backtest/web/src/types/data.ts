@@ -30,3 +30,16 @@ export interface QualityReport {
   coverage_score: number;
   overall_score: number;
 }
+
+export interface ColumnInfo {
+  name: string;
+  type: string;
+}
+
+export interface TablePreview {
+  table: string;
+  columns: ColumnInfo[];
+  rows: (string | number | null)[][];
+  total: number;
+  limit: number;
+}

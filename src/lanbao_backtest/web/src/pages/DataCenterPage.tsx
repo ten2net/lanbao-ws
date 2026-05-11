@@ -159,6 +159,12 @@ export function DataCenterPage() {
     queryFn: () => dataApi.quality(),
   });
 
+  const { data: previewData, isLoading: previewLoading } = useQuery({
+    queryKey: ['data', 'preview', previewTable],
+    queryFn: () => dataApi.preview(previewTable!),
+    enabled: !!previewTable,
+  });
+
   const triggerSyncMutation = useMutation({
     mutationFn: dataApi.triggerSync,
     onSuccess: () => {
@@ -283,14 +289,42 @@ export function DataCenterPage() {
       {/* 预览 Drawer */}
       <Drawer
         title={`预览: ${previewTable}`}
-        width={600}
+        width="80%"
         open={!!previewTable}
         onClose={() => setPreviewTable(null)}
       >
         {previewTable && (
           <div>
-            <p>表名: {previewTable}</p>
-            <p>显示前 100 行数据预览...</p>
+            <p style={{ marginBottom: 12 }}>
+              共 {previewData?.total ?? 0} 条记录
+              {previewData && previewData.total > previewData.limit
+                ? `，显示前 ${previewData.limit} 条`
+                : ''}
+            </p>
+            <Table
+              dataSource={
+                previewData?.rows.map((row, idx) => {
+                  const obj: Record<string, unknown> = { key: idx };
+                  previewData.columns.forEach((col, cidx) => {
+                    obj[col.name] = row[cidx];
+                  });
+                  return obj;
+                }) ?? []
+              }
+              columns={
+                previewData?.columns.map((col) => ({
+                  title: col.name,
+                  dataIndex: col.name,
+                  key: col.name,
+                  width: 140,
+                  ellipsis: true,
+                })) ?? []
+              }
+              loading={previewLoading}
+              size="small"
+              scroll={{ x: 'max-content' }}
+              pagination={{ pageSize: 20 }}
+            />
           </div>
         )}
       </Drawer>

@@ -24,6 +24,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/DataStats.msg"
   "msg/DataQualityItem.msg"
   "msg/SyncStatusDetail.msg"
+  "msg/SystemMetrics.msg"
 
   # 服务定义
   "srv/GetMarketData.srv"

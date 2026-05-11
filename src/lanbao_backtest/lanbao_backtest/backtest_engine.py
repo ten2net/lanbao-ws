@@ -172,11 +172,11 @@ class BacktestEngine:
             
             # 交易逻辑
             if signal == 1 and position == 0:  # 买入
-                # 计算买入数量
+                # 计算买入数量（A股：100股整数倍）
                 trade_capital = capital * config.position_size
-                quantity = int(trade_capital / price)
-                
-                if quantity > 0:
+                quantity = int(trade_capital / price / 100) * 100
+
+                if quantity >= 100:
                     amount = quantity * price
                     commission = amount * config.commission_rate
                     slippage_cost = amount * config.slippage

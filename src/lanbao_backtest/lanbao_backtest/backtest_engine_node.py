@@ -441,7 +441,7 @@ class BacktestEngineNode(LanBaoBaseNode):
     def _calculate_v2_performance(self, result):
         """计算 v2.0 绩效指标"""
         equity = result.equity_curve
-        initial_capital = self._config.initial_capital
+        initial_capital = self._engine._config.initial_capital
         daily_returns = equity.pct_change().dropna()
 
         total_return = (equity.iloc[-1] - initial_capital) / initial_capital if len(equity) > 0 else 0

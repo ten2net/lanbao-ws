@@ -8,8 +8,13 @@ from typing import Any, Dict, List, Optional
 
 def _get_reports_dir() -> Path:
     """获取报告目录（基于项目根目录）"""
-    # 从当前文件向上回溯: api/services/ -> api/ -> lanbao_backtest/ -> src/ -> project_root/
-    project_root = Path(__file__).parent.parent.parent.parent
+    current = Path(__file__).resolve()
+    project_root = current.parent.parent.parent.parent
+    # storage.py 在 src/lanbao_backtest/api/services/ 下，parent x4 得到 src/
+    # 回测引擎在 build/ 或 src/ 下，parent x4 得到项目根目录
+    # 统一修正：若当前在 src/ 内则向上到项目根目录
+    if project_root.name == "src" and (project_root.parent / "reports").exists():
+        project_root = project_root.parent
     reports_dir = project_root / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
     return reports_dir

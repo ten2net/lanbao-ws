@@ -1,0 +1,15 @@
+{
+  "backtest_id": "bt_ma_cross_20260511_105001",
+  "trades": [
+    {
+      "trade_id": "bt_ma_cross_20260511_105001_0",
+      "trade_date": "2025-02-11",
+      "action": "BUY",
+      "quantity": 875,
+      "price": 11.42,
+      "amount": 9992.5,
+      "commission": 12.9902,
+      "pnl": 96.25
+    }
+  ]
+}

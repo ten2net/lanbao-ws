@@ -154,3 +154,72 @@ class WsErrorMessage(BaseModel):
     type: str = "error"
     message: str
     timestamp: float
+
+
+# ── 数据底座 ──
+
+class DataTableInfo(BaseModel):
+    name: str
+    record_count: int
+    date_start: Optional[str] = None
+    date_end: Optional[str] = None
+    last_updated: Optional[str] = None
+    quality_score: float = 100.0
+
+
+class DataSummary(BaseModel):
+    total_symbols: int
+    total_daily_records: int
+    last_sync_time: Optional[str] = None
+    coverage_days: int
+
+
+class SyncTask(BaseModel):
+    id: str
+    source: str
+    status: str  # running / success / failed
+    progress: float
+    success_count: int
+    failed_count: int
+    duration_seconds: Optional[float] = None
+
+
+class QualityReport(BaseModel):
+    table: str
+    missing_rate: float
+    coverage_score: float
+    overall_score: float
+
+
+# ── 系统配置 ──
+
+class BacktestConfig(BaseModel):
+    default_initial_capital: float = 1_000_000.0
+    default_commission_rate: float = 0.0003
+    default_slippage: float = 0.001
+    default_backtest_days: int = 365
+
+
+class RiskConfig(BaseModel):
+    max_single_loss_pct: float = 0.05
+    max_drawdown_threshold: float = 0.15
+    max_position_pct: float = 0.8
+    circuit_breaker_enabled: bool = False
+
+
+class DataSyncConfig(BaseModel):
+    auto_sync_enabled: bool = True
+    sync_time: str = "09:00"
+    source_priority: str = "tushare > tdx > akshare > miniqmt"
+
+
+class NotificationConfig(BaseModel):
+    webhook_url: Optional[str] = None
+    alert_level_threshold: str = "warning"
+
+
+class SystemConfig(BaseModel):
+    backtest: BacktestConfig = Field(default_factory=BacktestConfig)
+    risk: RiskConfig = Field(default_factory=RiskConfig)
+    data_sync: DataSyncConfig = Field(default_factory=DataSyncConfig)
+    notification: NotificationConfig = Field(default_factory=NotificationConfig)

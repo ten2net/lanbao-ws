@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from .ros2_client import get_ros2_manager
-from .routes import backtests, strategies
+from .routes import backtests, strategies, data, config
 from .services.storage import storage
 from .websocket import progress_bridge
 
@@ -107,6 +107,8 @@ app.add_middleware(
 # 路由注册
 app.include_router(backtests.router, prefix="/api/v1", tags=["backtests"])
 app.include_router(strategies.router, prefix="/api/v1", tags=["strategies"])
+app.include_router(data.router, prefix="/api/v1", tags=["data"])
+app.include_router(config.router, prefix="/api/v1", tags=["config"])
 
 
 @app.get("/health")

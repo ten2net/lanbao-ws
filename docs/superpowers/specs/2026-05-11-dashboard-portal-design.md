@@ -32,9 +32,9 @@
 │              │  (5个新页面 + 现有)  │                    │
 │              └─────────────────────┘                    │
 └─────────────────────────┬───────────────────────────────┘
-                          │ WebSocket (ros2 websocket桥)
+                          │ WebSocket (rosbridge_suite)
 ┌─────────────────────────┴───────────────────────────────┐
-│              ROS2 WebSocket Bridge (外部)               │
+│              rosbridge_suite (ROS 官方 WebSocket 桥)     │
 │         统一转发 ROS2 Topics → WebSocket 客户端          │
 └─────────────────────────┬───────────────────────────────┘
                           │ ROS2 Topics
@@ -57,7 +57,7 @@
 | 图表 | Recharts + lightweight-charts | 复用现有图表库 |
 | 状态管理 | Zustand 4 | 扩展现有 store |
 | 数据获取 | TanStack Query v5 + Axios | HTTP API 调用 |
-| 实时数据 | WebSocket (ros2 websocket 桥) | 统一 ROS2 Topic 订阅 |
+| 实时数据 | WebSocket (rosbridge_suite) | 统一 ROS2 Topic 订阅 |
 | 主题 | Ant Design ConfigProvider + CSS Variables | 自适应 light/dark |
 
 ---
@@ -83,10 +83,11 @@
 **文件位置**: `web/src/services/ros2WebSocket.ts`
 
 **职责**:
-- 封装 ros2 websocket 桥的连接生命周期
+- 封装 rosbridge_suite (rosbridge v2 协议) 的 WebSocket 连接生命周期
 - 自动重连（指数退避，初始1秒，最大30秒）
 - Topic 订阅/取消订阅管理
 - 连接状态暴露给全局状态
+- **启动方式**: `ros2 launch rosbridge_server rosbridge_websocket_launch.xml`（默认端口9090）
 
 **接口设计**:
 
@@ -417,7 +418,7 @@ float32 load_average_1m
 | 场景 | 处理策略 | 用户感知 |
 |------|----------|----------|
 | WebSocket 断线 | 自动重连（指数退避，最大30秒） | 顶部指示灯变黄→红，全局提示「实时数据连接中断」 |
-| ros2 websocket 桥不可用 | 停止重连，显示离线状态 | 页面降级显示缓存数据，提示检查桥服务 |
+ | rosbridge_suite 不可用 | 停止重连，显示离线状态 | 页面降级显示缓存数据，提示检查 rosbridge_suite 服务 |
 | Topic 消息格式异常 | 忽略该条，console.warn | 无感知，不影响其他数据 |
 | HTTP API 失败 | 显示 `message.error()`，提供重试 | 明确错误提示（如「获取数据失败，请重试」） |
 | 节点离线 | 节点卡片状态变红 | 详情页显示「节点已离线」占位 |
@@ -517,7 +518,7 @@ web/src/
 
 ## 11. 风险与注意事项
 
-1. **ros2 websocket 桥依赖**: 实时监控功能依赖外部 ros2 websocket 桥服务，需在部署文档中明确该依赖。
+1. **rosbridge_suite 依赖**: 实时监控功能依赖 rosbridge_suite 服务，启动命令 `ros2 launch rosbridge_server rosbridge_websocket_launch.xml`，需在部署文档中明确该依赖。
 2. **时序数据内存管理**: 前端长期运行可能积累大量时序数据，必须实现固定长度队列，防止内存泄漏。
 3. **主题切换闪烁**: Ant Design ConfigProvider 切换主题时可能有短暂闪烁，建议用 CSS transition 平滑过渡。
 4. **移动端适配**: 监控仪表盘信息密度高，移动端体验可能受限，优先保证桌面端体验。

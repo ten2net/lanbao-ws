@@ -4,9 +4,9 @@
 
 **Goal:** 将 Streamlit Dashboard 中5个页面（系统概览、节点状态、风险监控、数据底座、系统配置）移植到 React 前端，升级为企业级 UI/UX（双层导航、主题系统、WebSocket 实时数据）。
 
-**Architecture:** 前端基础架构先升级（主题系统、WebSocket 管理器、双层导航布局），再基于此实现5个新页面；后端配合新增 ROS2 SystemMetrics 消息类型和 system_metrics_node 节点，FastAPI 新增数据底座和系统配置接口。所有实时数据统一通过 ros2 websocket 桥推送。
+**Architecture:** 前端基础架构先升级（主题系统、WebSocket 管理器、双层导航布局），再基于此实现5个新页面；后端配合新增 ROS2 SystemMetrics 消息类型和 system_metrics_node 节点，FastAPI 新增数据底座和系统配置接口。所有实时数据统一通过 rosbridge_suite 推送。
 
-**Tech Stack:** React 18 + TypeScript + Vite + Ant Design 5 + Zustand + TanStack Query + Recharts + ros2 websocket bridge
+**Tech Stack:** React 18 + TypeScript + Vite + Ant Design 5 + Zustand + TanStack Query + Recharts + rosbridge_suite
 
 **Branch:** `feat/dashboard-portal`
 
@@ -187,7 +187,15 @@ git commit -m "feat: 主题系统（themeStore + ConfigProvider 动态切换）"
 
 ---
 
-### Task 2: WebSocket 连接管理器
+### Task 2: WebSocket 连接管理器（rosbridge_suite）
+
+**说明**: 前端通过 rosbridge_suite 与 ROS2 通信。rosbridge_suite 是 ROS 官方推荐的 WebSocket 桥接方案，使用标准的 rosbridge v2 协议。
+
+**rosbridge_suite 启动方式**:
+```bash
+ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+```
+默认端口 9090，协议与 ros2-web-bridge 兼容。
 
 **Files:**
 - Create: `web/src/services/ros2WebSocket.ts`
@@ -278,10 +286,15 @@ export const useWSStore = create<WSState>((set) => ({
 }));
 ```
 
-- [ ] **Step 3: 创建 ROS2WebSocketManager**
+- [ ] **Step 3: 创建 ROS2WebSocketManager（rosbridge_suite 客户端）**
 
 `web/src/services/ros2WebSocket.ts`:
 ```typescript
+/**
+ * rosbridge_suite WebSocket 客户端
+ * 协议: rosbridge v2 (与 ros2-web-bridge 兼容)
+ * 启动后端: ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+ */
 import type { ROS2BridgeMessage, ConnectionState } from '../types/ros2';
 import { useWSStore } from '../stores/wsStore';
 

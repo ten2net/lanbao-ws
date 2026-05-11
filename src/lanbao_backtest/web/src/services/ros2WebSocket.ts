@@ -6,7 +6,13 @@
 import { useWSStore } from '../stores/wsStore';
 import type { ROS2BridgeMessage } from '../types/ros2';
 
-const WS_URL = import.meta.env.VITE_ROS2_WS_URL || 'ws://localhost:9090';
+function getDefaultWSUrl(): string {
+  const { protocol, host } = window.location;
+  const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${wsProtocol}//${host.split(':')[0]}:9090`;
+}
+
+const WS_URL = import.meta.env.VITE_ROS2_WS_URL || getDefaultWSUrl();
 
 const INITIAL_RECONNECT_DELAY = 1000;
 const MAX_RECONNECT_DELAY = 30000;

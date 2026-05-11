@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   Card,
   Table,
@@ -27,6 +27,113 @@ function qualityColor(score: number): string {
   if (score >= 70) return 'yellow';
   return 'red';
 }
+
+// Static columns (no component state dependency)
+const staticTableColumns = [
+  {
+    title: '表名',
+    dataIndex: 'name',
+    key: 'name',
+  },
+  {
+    title: '记录数',
+    dataIndex: 'record_count',
+    key: 'record_count',
+    render: (v: number) => formatNumber(v),
+  },
+  {
+    title: '数据起始日期',
+    dataIndex: 'date_start',
+    key: 'date_start',
+    render: (v?: string) => v || '-',
+  },
+  {
+    title: '数据结束日期',
+    dataIndex: 'date_end',
+    key: 'date_end',
+    render: (v?: string) => v || '-',
+  },
+  {
+    title: '更新时间',
+    dataIndex: 'last_updated',
+    key: 'last_updated',
+    render: (v?: string) => v || '-',
+  },
+  {
+    title: '质量评分',
+    dataIndex: 'quality_score',
+    key: 'quality_score',
+    render: (v: number) => (
+      <Tag color={qualityColor(v)}>{v}</Tag>
+    ),
+  },
+];
+
+const syncColumns = [
+  {
+    title: '数据源',
+    dataIndex: 'source',
+    key: 'source',
+  },
+  {
+    title: '状态',
+    dataIndex: 'status',
+    key: 'status',
+    render: (v: string) => {
+      const color = v === 'completed' ? 'green' : v === 'running' ? 'blue' : v === 'failed' ? 'red' : 'default';
+      return <Tag color={color}>{v}</Tag>;
+    },
+  },
+  {
+    title: '进度',
+    dataIndex: 'progress',
+    key: 'progress',
+    render: (v: number) => <Progress percent={v} size="small" />,
+  },
+  {
+    title: '成功数',
+    dataIndex: 'success_count',
+    key: 'success_count',
+  },
+  {
+    title: '失败数',
+    dataIndex: 'failed_count',
+    key: 'failed_count',
+  },
+  {
+    title: '耗时(秒)',
+    dataIndex: 'duration_seconds',
+    key: 'duration_seconds',
+    render: (v: number | null) => (v !== null ? `${v}s` : '-'),
+  },
+];
+
+const qualityColumns = [
+  {
+    title: '表名',
+    dataIndex: 'table',
+    key: 'table',
+  },
+  {
+    title: '缺失率',
+    dataIndex: 'missing_rate',
+    key: 'missing_rate',
+    render: (v: number) => `${(v * 100).toFixed(2)}%`,
+  },
+  {
+    title: '覆盖评分',
+    dataIndex: 'coverage_score',
+    key: 'coverage_score',
+  },
+  {
+    title: '综合评分',
+    dataIndex: 'overall_score',
+    key: 'overall_score',
+    render: (v: number) => (
+      <Tag color={qualityColor(v)}>{v}</Tag>
+    ),
+  },
+];
 
 export function DataCenterPage() {
   const [previewTable, setPreviewTable] = useState<string | null>(null);
@@ -64,44 +171,12 @@ export function DataCenterPage() {
     },
   });
 
-  const tableColumns = [
-    {
-      title: '表名',
-      dataIndex: 'name',
-      key: 'name',
-    },
-    {
-      title: '记录数',
-      dataIndex: 'record_count',
-      key: 'record_count',
-      render: (v: number) => formatNumber(v),
-    },
-    {
-      title: '数据起始日期',
-      dataIndex: 'date_start',
-      key: 'date_start',
-      render: (v?: string) => v || '-',
-    },
-    {
-      title: '数据结束日期',
-      dataIndex: 'date_end',
-      key: 'date_end',
-      render: (v?: string) => v || '-',
-    },
-    {
-      title: '更新时间',
-      dataIndex: 'last_updated',
-      key: 'last_updated',
-      render: (v?: string) => v || '-',
-    },
-    {
-      title: '质量评分',
-      dataIndex: 'quality_score',
-      key: 'quality_score',
-      render: (v: number) => (
-        <Tag color={qualityColor(v)}>{v}</Tag>
-      ),
-    },
+  const handlePreview = useCallback((name: string) => {
+    setPreviewTable(name);
+  }, []);
+
+  const tableColumns = useMemo(() => [
+    ...staticTableColumns,
     {
       title: '操作',
       key: 'action',
@@ -109,79 +184,17 @@ export function DataCenterPage() {
         <Button
           size="small"
           icon={<EyeOutlined />}
-          onClick={() => setPreviewTable(record.name)}
+          onClick={() => handlePreview(record.name)}
         >
           预览
         </Button>
       ),
     },
-  ];
+  ], [handlePreview]);
 
-  const syncColumns = [
-    {
-      title: '数据源',
-      dataIndex: 'source',
-      key: 'source',
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (v: string) => {
-        const color = v === 'completed' ? 'green' : v === 'running' ? 'blue' : v === 'failed' ? 'red' : 'default';
-        return <Tag color={color}>{v}</Tag>;
-      },
-    },
-    {
-      title: '进度',
-      dataIndex: 'progress',
-      key: 'progress',
-      render: (v: number) => <Progress percent={v} size="small" />,
-    },
-    {
-      title: '成功数',
-      dataIndex: 'success_count',
-      key: 'success_count',
-    },
-    {
-      title: '失败数',
-      dataIndex: 'failed_count',
-      key: 'failed_count',
-    },
-    {
-      title: '耗时(秒)',
-      dataIndex: 'duration_seconds',
-      key: 'duration_seconds',
-      render: (v: number | null) => (v !== null ? `${v}s` : '-'),
-    },
-  ];
-
-  const qualityColumns = [
-    {
-      title: '表名',
-      dataIndex: 'table',
-      key: 'table',
-    },
-    {
-      title: '缺失率',
-      dataIndex: 'missing_rate',
-      key: 'missing_rate',
-      render: (v: number) => `${(v * 100).toFixed(2)}%`,
-    },
-    {
-      title: '覆盖评分',
-      dataIndex: 'coverage_score',
-      key: 'coverage_score',
-    },
-    {
-      title: '综合评分',
-      dataIndex: 'overall_score',
-      key: 'overall_score',
-      render: (v: number) => (
-        <Tag color={qualityColor(v)}>{v}</Tag>
-      ),
-    },
-  ];
+  const tableData = useMemo(() => tables || [], [tables]);
+  const syncData = useMemo(() => syncTasks || [], [syncTasks]);
+  const qualityData = useMemo(() => quality || [], [quality]);
 
   return (
     <div style={{ padding: 24 }}>
@@ -221,12 +234,11 @@ export function DataCenterPage() {
       {/* 数据表列表 */}
       <Card style={{ marginTop: 16 }} title="数据表">
         <Table
-          dataSource={tables || []}
+          dataSource={tableData}
           columns={tableColumns}
           rowKey="name"
           size="small"
           pagination={{ pageSize: 10 }}
-          scroll={{ x: 'max-content' }}
         />
       </Card>
 
@@ -247,24 +259,22 @@ export function DataCenterPage() {
             }
           >
             <Table
-              dataSource={syncTasks || []}
+              dataSource={syncData}
               columns={syncColumns}
               rowKey="id"
               size="small"
               pagination={{ pageSize: 5 }}
-              scroll={{ x: 'max-content' }}
             />
           </Card>
         </Col>
         <Col xs={24} md={12}>
           <Card title="数据质量">
             <Table
-              dataSource={quality || []}
+              dataSource={qualityData}
               columns={qualityColumns}
               rowKey="table"
               size="small"
               pagination={{ pageSize: 5 }}
-              scroll={{ x: 'max-content' }}
             />
           </Card>
         </Col>

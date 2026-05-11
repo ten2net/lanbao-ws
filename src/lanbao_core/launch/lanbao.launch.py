@@ -3,9 +3,11 @@
 """
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, LogInfo
-from launch.substitutions import LaunchConfiguration
+from launch.actions import DeclareLaunchArgument, LogInfo, IncludeLaunchDescription
+from launch.launch_description_sources import AnyLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
@@ -34,5 +36,21 @@ def generate_launch_description():
             parameters=[{'log_level': log_level}]
         ),
 
-        LogInfo(msg='揽宝核心服务启动完成'),
+        # rosbridge WebSocket 服务 (供前端连接)
+        IncludeLaunchDescription(
+            AnyLaunchDescriptionSource(
+                PathJoinSubstitution([
+                    FindPackageShare('rosbridge_server'),
+                    'launch',
+                    'rosbridge_websocket_launch.xml'
+                ])
+            ),
+            launch_arguments={
+                'port': '9090',
+                'address': '',
+                'max_message_size': '10000000',
+            }.items()
+        ),
+
+        LogInfo(msg='揽宝核心服务启动完成 (含 WebSocket 桥接)'),
     ])

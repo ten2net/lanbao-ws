@@ -37,9 +37,9 @@ start_node() {
     local node_name=$1
     local package=$2
     local module=$3
-    
+
     echo -e "${BLUE}启动 $node_name...${NC}"
-    
+
     # 创建启动脚本
     cat > "logs/${node_name}_launcher.sh" << EOF
 #!/bin/bash
@@ -52,17 +52,42 @@ export PATH=/opt/ros/humble/bin:\$PATH
 exec ./.venv/bin/python -m ${module} 2>&1
 EOF
     chmod +x "logs/${node_name}_launcher.sh"
-    
+
     # 使用nohup启动
     nohup "logs/${node_name}_launcher.sh" > "logs/${node_name}.log" 2>&1 &
-    
+
     echo $! > "logs/${node_name}.pid"
     echo -e "${GREEN}✓ $node_name 已启动 (PID: $!)${NC}"
+}
+
+# 启动 ROS2 WebSocket 桥接 (rosbridge_server)
+start_rosbridge() {
+    echo -e "${BLUE}启动 rosbridge_server (WebSocket: ws://localhost:9090)...${NC}"
+
+    cat > "logs/rosbridge_launcher.sh" << 'EOF'
+#!/bin/bash
+cd "$(dirname "$0")/.."
+source /opt/ros/humble/setup.bash
+source ./install/setup.bash
+export LD_LIBRARY_PATH=./install/lanbao_interfaces/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib:/usr/local/lib
+export PATH=/opt/ros/humble/bin:$PATH
+exec ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9090 max_message_size:=10000000 2>&1
+EOF
+    chmod +x "logs/rosbridge_launcher.sh"
+
+    nohup "logs/rosbridge_launcher.sh" > "logs/rosbridge_server.log" 2>&1 &
+
+    echo $! > "logs/rosbridge_server.pid"
+    echo -e "${GREEN}✓ rosbridge_server 已启动 (PID: $!)${NC}"
 }
 
 # 启动所有节点
 echo ""
 echo "正在启动节点..."
+
+# 0. 启动 rosbridge_server (WebSocket 桥接)
+start_rosbridge
+sleep 2
 
 # 1. 市场数据节点
 start_node "market_data" "lanbao_data" "lanbao_data.market_data_node"

@@ -101,11 +101,12 @@ export function SystemConfigPage() {
     if (configData) {
       setConfig(configData);
       // Convert sync_time string to dayjs for TimePicker
+      const syncTime = configData.data_sync?.sync_time ?? DEFAULT_CONFIG.data_sync.sync_time;
       const formValues = {
         ...configData,
         data_sync: {
-          ...configData.data_sync,
-          sync_time: dayjs(configData.data_sync.sync_time, 'HH:mm'),
+          ...(configData.data_sync || DEFAULT_CONFIG.data_sync),
+          sync_time: dayjs(syncTime, 'HH:mm'),
         },
       };
       form.setFieldsValue(formValues as any);

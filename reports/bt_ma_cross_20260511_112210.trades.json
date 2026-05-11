@@ -1,0 +1,55 @@
+{
+  "backtest_id": "bt_ma_cross_20260511_112210",
+  "trades": [
+    {
+      "trade_id": "bt_ma_cross_20260511_112210_0",
+      "trade_date": "2026-03-03",
+      "action": "BUY",
+      "quantity": 578,
+      "price": 17.29,
+      "amount": 9993.62,
+      "commission": 12.9917,
+      "pnl": null
+    },
+    {
+      "trade_id": "bt_ma_cross_20260511_112210_1",
+      "trade_date": "2026-03-20",
+      "action": "SELL",
+      "quantity": 578,
+      "price": 17.1,
+      "amount": 9883.8,
+      "commission": 12.8489,
+      "pnl": -122.67
+    },
+    {
+      "trade_id": "bt_ma_cross_20260511_112210_2",
+      "trade_date": "2026-03-31",
+      "action": "BUY",
+      "quantity": 600,
+      "price": 16.62,
+      "amount": 9972.0,
+      "commission": 12.9636,
+      "pnl": null
+    },
+    {
+      "trade_id": "bt_ma_cross_20260511_112210_3",
+      "trade_date": "2026-04-01",
+      "action": "SELL",
+      "quantity": 600,
+      "price": 16.93,
+      "amount": 10158.0,
+      "commission": 13.2054,
+      "pnl": 172.79
+    },
+    {
+      "trade_id": "bt_ma_cross_20260511_112210_4",
+      "trade_date": "2026-04-10",
+      "action": "BUY",
+      "quantity": 523,
+      "price": 19.12,
+      "amount": 9999.76,
+      "commission": 12.9997,
+      "pnl": 805.42
+    }
+  ]
+}

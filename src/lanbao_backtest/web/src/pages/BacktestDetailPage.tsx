@@ -27,6 +27,9 @@ export function BacktestDetailPage() {
   const isLoading = detailLoading || equityLoading || tradesLoading || monthlyLoading;
 
   const perf = detail?.performance ?? {};
+  const returns = perf.returns ?? {};
+  const risk = perf.risk ?? {};
+  const tradesPerf = perf.trades ?? {};
   const meta = detail?.meta ?? {};
 
   const tradeColumns = [
@@ -112,32 +115,32 @@ export function BacktestDetailPage() {
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={12} sm={8} md={6} lg={4}>
           <Card size="small">
-            <Statistic title="总收益" value={formatPct(perf.total_return)} valueStyle={{ color: (perf.total_return ?? 0) >= 0 ? '#cf304a' : '#228b22' }} />
+            <Statistic title="总收益" value={formatPct(returns.total_return_pct)} valueStyle={{ color: (returns.total_return_pct ?? 0) >= 0 ? '#cf304a' : '#228b22' }} />
           </Card>
         </Col>
         <Col xs={12} sm={8} md={6} lg={4}>
           <Card size="small">
-            <Statistic title="年化收益" value={formatPct(perf.annual_return)} valueStyle={{ color: (perf.annual_return ?? 0) >= 0 ? '#cf304a' : '#228b22' }} />
+            <Statistic title="年化收益" value={formatPct(returns.annual_return_pct)} valueStyle={{ color: (returns.annual_return_pct ?? 0) >= 0 ? '#cf304a' : '#228b22' }} />
           </Card>
         </Col>
         <Col xs={12} sm={8} md={6} lg={4}>
           <Card size="small">
-            <Statistic title="夏普比率" value={formatNumber(perf.sharpe_ratio)} />
+            <Statistic title="夏普比率" value={formatNumber(risk.sharpe_ratio)} />
           </Card>
         </Col>
         <Col xs={12} sm={8} md={6} lg={4}>
           <Card size="small">
-            <Statistic title="最大回撤" value={formatPct(perf.max_drawdown)} valueStyle={{ color: '#228b22' }} />
+            <Statistic title="最大回撤" value={formatPct(risk.max_drawdown_pct)} valueStyle={{ color: '#228b22' }} />
           </Card>
         </Col>
         <Col xs={12} sm={8} md={6} lg={4}>
           <Card size="small">
-            <Statistic title="胜率" value={perf.win_rate != null ? `${(perf.win_rate * 100).toFixed(1)}%` : '-'} />
+            <Statistic title="胜率" value={tradesPerf.win_rate_pct != null ? `${tradesPerf.win_rate_pct.toFixed(1)}%` : '-'} />
           </Card>
         </Col>
         <Col xs={12} sm={8} md={6} lg={4}>
           <Card size="small">
-            <Statistic title="交易次数" value={formatNumber(perf.trade_count, 0)} />
+            <Statistic title="交易次数" value={formatNumber(tradesPerf.total_count, 0)} />
           </Card>
         </Col>
       </Row>

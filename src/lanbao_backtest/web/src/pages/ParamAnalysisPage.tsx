@@ -17,6 +17,9 @@ export function ParamAnalysisPage() {
 
   const meta = detail?.meta ?? {};
   const perf = detail?.performance ?? {};
+  const returns = perf.returns ?? {};
+  const risk = perf.risk ?? {};
+  const tradesPerf = perf.trades ?? {};
 
   const params = meta.params ?? {};
   const paramEntries = Object.entries(params);
@@ -65,28 +68,28 @@ export function ParamAnalysisPage() {
           <Card title="性能指标" size="small" style={{ marginBottom: 24 }}>
             <Row gutter={[16, 16]}>
               <Col xs={12} sm={8} md={6} lg={4}>
-                <Statistic title="总收益" value={formatPct(perf.total_return)} valueStyle={{ color: (perf.total_return ?? 0) >= 0 ? '#cf304a' : '#228b22' }} />
+                <Statistic title="总收益" value={formatPct(returns.total_return_pct)} valueStyle={{ color: (returns.total_return_pct ?? 0) >= 0 ? '#cf304a' : '#228b22' }} />
               </Col>
               <Col xs={12} sm={8} md={6} lg={4}>
-                <Statistic title="年化收益" value={formatPct(perf.annual_return)} valueStyle={{ color: (perf.annual_return ?? 0) >= 0 ? '#cf304a' : '#228b22' }} />
+                <Statistic title="年化收益" value={formatPct(returns.annual_return_pct)} valueStyle={{ color: (returns.annual_return_pct ?? 0) >= 0 ? '#cf304a' : '#228b22' }} />
               </Col>
               <Col xs={12} sm={8} md={6} lg={4}>
-                <Statistic title="夏普比率" value={perf.sharpe_ratio != null ? perf.sharpe_ratio.toFixed(2) : '-'} />
+                <Statistic title="夏普比率" value={risk.sharpe_ratio != null ? risk.sharpe_ratio.toFixed(2) : '-'} />
               </Col>
               <Col xs={12} sm={8} md={6} lg={4}>
-                <Statistic title="最大回撤" value={formatPct(perf.max_drawdown)} valueStyle={{ color: '#228b22' }} />
+                <Statistic title="最大回撤" value={formatPct(risk.max_drawdown_pct)} valueStyle={{ color: '#228b22' }} />
               </Col>
               <Col xs={12} sm={8} md={6} lg={4}>
-                <Statistic title="胜率" value={perf.win_rate != null ? `${(perf.win_rate * 100).toFixed(1)}%` : '-'} />
+                <Statistic title="胜率" value={tradesPerf.win_rate_pct != null ? `${tradesPerf.win_rate_pct.toFixed(1)}%` : '-'} />
               </Col>
               <Col xs={12} sm={8} md={6} lg={4}>
-                <Statistic title="交易次数" value={perf.trade_count != null ? String(perf.trade_count) : '-'} />
+                <Statistic title="交易次数" value={tradesPerf.total_count != null ? String(tradesPerf.total_count) : '-'} />
               </Col>
               <Col xs={12} sm={8} md={6} lg={4}>
-                <Statistic title="盈亏比" value={perf.profit_factor != null ? perf.profit_factor.toFixed(2) : '-'} />
+                <Statistic title="盈亏比" value={tradesPerf.profit_factor != null ? tradesPerf.profit_factor.toFixed(2) : '-'} />
               </Col>
               <Col xs={12} sm={8} md={6} lg={4}>
-                <Statistic title="平均持仓天数" value={perf.avg_holding_days != null ? perf.avg_holding_days.toFixed(1) : '-'} />
+                <Statistic title="平均持仓天数" value={tradesPerf.avg_holding_days != null ? tradesPerf.avg_holding_days.toFixed(1) : '-'} />
               </Col>
             </Row>
           </Card>

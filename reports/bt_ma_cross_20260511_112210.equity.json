@@ -1,0 +1,467 @@
+{
+  "backtest_id": "bt_ma_cross_20260511_112210",
+  "series": [
+    {
+      "date": "2026-01-05",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-06",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-07",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-08",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-09",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-12",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-13",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-14",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-15",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-16",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-19",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-20",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-21",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-22",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-23",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-26",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-27",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-28",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-29",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-01-30",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-02-02",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-02-03",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-02-04",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-02-05",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-02-06",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-02-09",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-02-10",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-02-11",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-02-12",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-02-13",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-02-24",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-02-25",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-02-26",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-02-27",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-03-02",
+      "equity": 100000.0,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-03-03",
+      "equity": 99987.01,
+      "drawdown_pct": -0.01,
+      "daily_return_pct": -0.01
+    },
+    {
+      "date": "2026-03-04",
+      "equity": 99929.21,
+      "drawdown_pct": -0.07,
+      "daily_return_pct": -0.06
+    },
+    {
+      "date": "2026-03-05",
+      "equity": 100374.27,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.45
+    },
+    {
+      "date": "2026-03-06",
+      "equity": 100247.11,
+      "drawdown_pct": -0.13,
+      "daily_return_pct": -0.13
+    },
+    {
+      "date": "2026-03-09",
+      "equity": 100033.25,
+      "drawdown_pct": -0.34,
+      "daily_return_pct": -0.21
+    },
+    {
+      "date": "2026-03-10",
+      "equity": 100299.13,
+      "drawdown_pct": -0.07,
+      "daily_return_pct": 0.27
+    },
+    {
+      "date": "2026-03-11",
+      "equity": 100617.03,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.32
+    },
+    {
+      "date": "2026-03-12",
+      "equity": 100478.31,
+      "drawdown_pct": -0.14,
+      "daily_return_pct": -0.14
+    },
+    {
+      "date": "2026-03-13",
+      "equity": 100414.73,
+      "drawdown_pct": -0.2,
+      "daily_return_pct": -0.06
+    },
+    {
+      "date": "2026-03-16",
+      "equity": 100333.81,
+      "drawdown_pct": -0.28,
+      "daily_return_pct": -0.08
+    },
+    {
+      "date": "2026-03-17",
+      "equity": 99992.79,
+      "drawdown_pct": -0.62,
+      "daily_return_pct": -0.34
+    },
+    {
+      "date": "2026-03-18",
+      "equity": 99946.55,
+      "drawdown_pct": -0.67,
+      "daily_return_pct": -0.05
+    },
+    {
+      "date": "2026-03-19",
+      "equity": 99674.89,
+      "drawdown_pct": -0.94,
+      "daily_return_pct": -0.27
+    },
+    {
+      "date": "2026-03-20",
+      "equity": 99864.34,
+      "drawdown_pct": -0.75,
+      "daily_return_pct": 0.19
+    },
+    {
+      "date": "2026-03-23",
+      "equity": 99864.34,
+      "drawdown_pct": -0.75,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-03-24",
+      "equity": 99864.34,
+      "drawdown_pct": -0.75,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-03-25",
+      "equity": 99864.34,
+      "drawdown_pct": -0.75,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-03-26",
+      "equity": 99864.34,
+      "drawdown_pct": -0.75,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-03-27",
+      "equity": 99864.34,
+      "drawdown_pct": -0.75,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-03-30",
+      "equity": 99864.34,
+      "drawdown_pct": -0.75,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-03-31",
+      "equity": 99851.38,
+      "drawdown_pct": -0.76,
+      "daily_return_pct": -0.01
+    },
+    {
+      "date": "2026-04-01",
+      "equity": 100024.17,
+      "drawdown_pct": -0.59,
+      "daily_return_pct": 0.17
+    },
+    {
+      "date": "2026-04-02",
+      "equity": 100024.17,
+      "drawdown_pct": -0.59,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-04-03",
+      "equity": 100024.17,
+      "drawdown_pct": -0.59,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-04-07",
+      "equity": 100024.17,
+      "drawdown_pct": -0.59,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-04-08",
+      "equity": 100024.17,
+      "drawdown_pct": -0.59,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-04-09",
+      "equity": 100024.17,
+      "drawdown_pct": -0.59,
+      "daily_return_pct": 0.0
+    },
+    {
+      "date": "2026-04-10",
+      "equity": 100011.17,
+      "drawdown_pct": -0.6,
+      "daily_return_pct": -0.01
+    },
+    {
+      "date": "2026-04-13",
+      "equity": 100152.38,
+      "drawdown_pct": -0.46,
+      "daily_return_pct": 0.14
+    },
+    {
+      "date": "2026-04-14",
+      "equity": 100272.67,
+      "drawdown_pct": -0.34,
+      "daily_return_pct": 0.12
+    },
+    {
+      "date": "2026-04-15",
+      "equity": 99969.33,
+      "drawdown_pct": -0.64,
+      "daily_return_pct": -0.3
+    },
+    {
+      "date": "2026-04-16",
+      "equity": 100377.27,
+      "drawdown_pct": -0.24,
+      "daily_return_pct": 0.41
+    },
+    {
+      "date": "2026-04-17",
+      "equity": 100335.43,
+      "drawdown_pct": -0.28,
+      "daily_return_pct": -0.04
+    },
+    {
+      "date": "2026-04-20",
+      "equity": 100293.59,
+      "drawdown_pct": -0.32,
+      "daily_return_pct": -0.04
+    },
+    {
+      "date": "2026-04-21",
+      "equity": 100565.55,
+      "drawdown_pct": -0.05,
+      "daily_return_pct": 0.27
+    },
+    {
+      "date": "2026-04-22",
+      "equity": 100806.13,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.24
+    },
+    {
+      "date": "2026-04-23",
+      "equity": 101078.09,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.27
+    },
+    {
+      "date": "2026-04-24",
+      "equity": 100968.26,
+      "drawdown_pct": -0.11,
+      "daily_return_pct": -0.11
+    },
+    {
+      "date": "2026-04-27",
+      "equity": 100701.53,
+      "drawdown_pct": -0.37,
+      "daily_return_pct": -0.26
+    },
+    {
+      "date": "2026-04-28",
+      "equity": 100868.89,
+      "drawdown_pct": -0.21,
+      "daily_return_pct": 0.17
+    },
+    {
+      "date": "2026-04-29",
+      "equity": 101140.85,
+      "drawdown_pct": 0.0,
+      "daily_return_pct": 0.27
+    },
+    {
+      "date": "2026-04-30",
+      "equity": 100816.59,
+      "drawdown_pct": -0.32,
+      "daily_return_pct": -0.32
+    }
+  ]
+}

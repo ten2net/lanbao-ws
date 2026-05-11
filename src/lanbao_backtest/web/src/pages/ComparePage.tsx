@@ -52,7 +52,7 @@ export function ComparePage() {
       title: '胜率',
       dataIndex: 'win_rate',
       key: 'win_rate',
-      render: (v: number | null) => v != null ? `${(v * 100).toFixed(1)}%` : '-',
+      render: (v: number | null) => v != null ? `${v.toFixed(1)}%` : '-',
     },
     {
       title: '交易次数',

@@ -109,7 +109,7 @@ export function BacktestTable() {
       dataIndex: 'win_rate',
       key: 'win_rate',
       render: (val: number | null) => (
-        <span>{val != null ? `${(val * 100).toFixed(1)}%` : '-'}</span>
+        <span>{val != null ? `${val.toFixed(1)}%` : '-'}</span>
       ),
     },
     {

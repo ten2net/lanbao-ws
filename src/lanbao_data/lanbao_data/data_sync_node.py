@@ -110,7 +110,12 @@ class DataSyncNode(LanBaoBaseNode):
                 logger.info("配置为启动时立即执行同步")
                 self._trigger_sync()
             else:
-                logger.info(f"数据同步节点已启动，将在每日 {self._schedule_time} 执行同步")
+                # 检查今天是否已同步，若未同步且已过同步时间则补同步
+                if self._should_sync_today():
+                    logger.info(f"当前已过同步时间 {self._schedule_time}，今天尚未同步，立即补同步")
+                    self._trigger_sync()
+                else:
+                    logger.info(f"数据同步节点已启动，将在每日 {self._schedule_time} 执行同步")
 
             return True
 
@@ -161,6 +166,27 @@ class DataSyncNode(LanBaoBaseNode):
         else:
             logger.warning(f"配置文件不存在: {config_path}，使用默认配置")
 
+    def _should_sync_today(self) -> bool:
+        """判断今天是否需要同步（已过同步时间且今天未同步）"""
+        if not self._sync_enabled or self._sync_running:
+            return False
+
+        now = datetime.now()
+        current_time = now.strftime('%H:%M')
+
+        # 当前时间是否已过同步时间
+        if current_time < self._schedule_time:
+            return False
+
+        # 今天是否已同步过
+        if self._last_sync_time:
+            last_date = self._last_sync_time.date()
+            today = now.date()
+            if last_date == today:
+                return False
+
+        return True
+
     def _on_schedule_check(self):
         """定时检查是否到达同步时间"""
         if not self._sync_enabled or self._sync_running:
@@ -169,11 +195,14 @@ class DataSyncNode(LanBaoBaseNode):
         now = datetime.now()
         current_time = now.strftime('%H:%M')
 
-        # 检查是否到达设定的同步时间
-        if current_time == self._schedule_time:
-            # 避免一分钟内重复触发
-            if self._last_sync_time and (now - self._last_sync_time).total_seconds() < 3600:
-                return
+        # 检查是否到达设定的同步时间，或已过同步时间但今天未同步
+        if current_time >= self._schedule_time:
+            # 今天是否已同步过
+            if self._last_sync_time:
+                last_date = self._last_sync_time.date()
+                today = now.date()
+                if last_date == today:
+                    return
 
             self._trigger_sync()
 

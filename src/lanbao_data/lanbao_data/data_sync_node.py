@@ -24,6 +24,7 @@ from loguru import logger
 
 from lanbao_core.base_node import LanBaoBaseNode
 from lanbao_core.config import NodeConfig
+from std_msgs.msg import String as StdString
 
 from .tushare_adapter import TushareAdapter
 from .duckdb_storage import DuckDBStorage
@@ -94,6 +95,15 @@ class DataSyncNode(LanBaoBaseNode):
                 self._on_schedule_check,
                 callback_group=self._callback_group
             )
+
+            # 创建手动同步触发订阅
+            self._sync_trigger_sub = self.create_subscription(
+                StdString,
+                '/data/trigger_sync',
+                self._on_sync_trigger,
+                10
+            )
+            logger.info("已注册手动同步触发订阅: /data/trigger_sync")
 
             # 启动时执行一次同步（如果配置启用）
             if self._run_on_startup:
@@ -166,6 +176,11 @@ class DataSyncNode(LanBaoBaseNode):
                 return
 
             self._trigger_sync()
+
+    def _on_sync_trigger(self, msg: StdString):
+        """接收手动同步触发消息"""
+        logger.info(f"收到手动同步触发请求: {msg.data}")
+        self._trigger_sync()
 
     def _trigger_sync(self):
         """触发后台同步任务"""

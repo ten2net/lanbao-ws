@@ -5,3 +5,30 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* 主题过渡动画 */
+* {
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+/* 监控图表容器 */
+.metric-chart-container {
+  height: 280px;
+}
+
+/* KPI 卡片 */
+.kpi-card {
+  text-align: center;
+}
+
+.kpi-value {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--ant-color-text);
+}
+
+.kpi-label {
+  font-size: 14px;
+  color: var(--ant-color-text-secondary);
+  margin-top: 4px;
+}

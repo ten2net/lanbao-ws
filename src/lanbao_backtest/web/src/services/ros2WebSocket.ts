@@ -23,7 +23,7 @@ export class ROS2WebSocketManager {
     this.connect();
   }
 
-  private connect(): void {
+  connect(): void {
     if (this.ws?.readyState === WebSocket.CONNECTING || this.ws?.readyState === WebSocket.OPEN) {
       return;
     }

@@ -1,7 +1,7 @@
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Card, Button, Empty, Tag, Descriptions, Statistic, Row, Col } from 'antd';
-import { ArrowLeftOutlined } from '@ant-design/icons';
-import { useBacktestDetail } from '../hooks/useBacktests';
+import { Card, Button, Empty, Tag, Descriptions, Statistic, Row, Col, Table } from 'antd';
+import { ArrowLeftOutlined, BarChartOutlined } from '@ant-design/icons';
+import { useBacktestDetail, useBacktestList } from '../hooks/useBacktests';
 
 function formatPct(val: number | null) {
   if (val == null) return '-';
@@ -14,6 +14,7 @@ export function ParamAnalysisPage() {
   const backtestId = searchParams.get('backtestId') || undefined;
 
   const { data: detail, isLoading } = useBacktestDetail(backtestId);
+  const { data: listData, isLoading: listLoading } = useBacktestList();
 
   const meta = detail?.meta ?? {};
   const perf = detail?.performance ?? {};
@@ -23,6 +24,32 @@ export function ParamAnalysisPage() {
 
   const params = meta.params ?? {};
   const paramEntries = Object.entries(params);
+
+  const listColumns = [
+    { title: '回测ID', dataIndex: 'backtest_id', key: 'id' },
+    { title: '策略', dataIndex: 'strategy_name', key: 'strategy', render: (v: string, r: any) => v || r.strategy_id },
+    { title: '标的', dataIndex: 'symbol', key: 'symbol' },
+    {
+      title: '总收益',
+      dataIndex: 'total_return',
+      key: 'total_return',
+      render: (v: number | null) => <span style={{ color: (v ?? 0) >= 0 ? '#cf304a' : '#228b22' }}>{formatPct(v)}</span>,
+    },
+    {
+      title: '操作',
+      key: 'action',
+      render: (_: any, record: any) => (
+        <Button
+          icon={<BarChartOutlined />}
+          size="small"
+          type="primary"
+          onClick={() => navigate(`/param-analysis?backtestId=${record.backtest_id}`)}
+        >
+          查看分析
+        </Button>
+      ),
+    },
+  ];
 
   return (
     <div>
@@ -37,7 +64,16 @@ export function ParamAnalysisPage() {
       {isLoading ? (
         <Card size="small" loading />
       ) : !backtestId ? (
-        <Empty description="未指定回测ID" style={{ marginTop: 40 }} />
+        <Card title="选择要分析的回测" size="small">
+          <Table
+            columns={listColumns}
+            dataSource={listData?.items ?? []}
+            rowKey="backtest_id"
+            size="small"
+            loading={listLoading}
+            pagination={false}
+          />
+        </Card>
       ) : (
         <>
           <Descriptions title={`回测: ${backtestId}`} bordered size="small" style={{ marginBottom: 24 }}>

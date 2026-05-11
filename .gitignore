@@ -90,4 +90,4 @@ build/
 log/
 .mcp.json
 data/
-
+node_modules/

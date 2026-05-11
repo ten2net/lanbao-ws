@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Button, Select, Space, Table, Tag, Statistic, Row, Col, Empty } from 'antd';
-import { BarChartOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { Card, Button, Select, Space, Table, Statistic, Row, Col, Empty } from 'antd';
+import { ArrowLeftOutlined } from '@ant-design/icons';
 import { useBacktestList } from '../hooks/useBacktests';
-import { useBacktestStore } from '../stores/backtestStore';
 import { EquityCurve } from '../components/Charts/EquityCurve';
 import { useEquityCurve } from '../hooks/useBacktests';
 
@@ -16,7 +15,6 @@ function formatPct(val: number | null) {
 
 export function ComparePage() {
   const navigate = useNavigate();
-  const { filters } = useBacktestStore();
   const { data: listData } = useBacktestList();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 

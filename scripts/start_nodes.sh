@@ -111,6 +111,10 @@ sleep 1
 
 # 6. 监控节点
 start_node "monitor" "lanbao_monitor" "lanbao_monitor.monitor_node"
+sleep 1
+
+# 7. 系统指标节点
+start_node "system_metrics" "lanbao_monitor" "lanbao_monitor.system_metrics_node"
 
 echo ""
 echo -e "${GREEN}=======================================${NC}"
@@ -121,6 +125,7 @@ echo "使用以下命令查看日志:"
 echo "  tail -f logs/market_data.log"
 echo "  tail -f logs/backtest.log"
 echo "  tail -f logs/strategy.log"
+echo "  tail -f logs/system_metrics.log"
 echo ""
 echo "使用以下命令停止所有节点:"
 echo "  ./scripts/stop_nodes.sh"

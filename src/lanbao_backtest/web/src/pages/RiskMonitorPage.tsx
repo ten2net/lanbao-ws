@@ -14,24 +14,17 @@ import { useAlerts } from '../hooks/useAlerts';
 import { useMonitorStore } from '../stores/monitorStore';
 import { MetricChart } from '../components/Monitor/MetricChart';
 import { AlertBadge } from '../components/Monitor/AlertBadge';
-import type { RiskAlertMsg } from '../types/ros2';
+import type { SystemAlertMsg } from '../types/ros2';
 
-type LevelFilter = 'ALL' | RiskAlertMsg['level'];
+type AlertFilter = 'ALL' | SystemAlertMsg['alert_type'];
 
-const FILTER_OPTIONS: { key: LevelFilter; label: string }[] = [
+const FILTER_OPTIONS: { key: AlertFilter; label: string }[] = [
   { key: 'ALL', label: '全部' },
   { key: 'CRITICAL', label: '严重' },
-  { key: 'HIGH', label: '高' },
-  { key: 'MEDIUM', label: '中' },
-  { key: 'LOW', label: '低' },
+  { key: 'ERROR', label: '错误' },
+  { key: 'WARNING', label: '警告' },
+  { key: 'INFO', label: '信息' },
 ];
-
-const TYPE_LABEL: Record<RiskAlertMsg['alert_type'], string> = {
-  POSITION: '仓位',
-  DRAWDOWN: '回撤',
-  VOLATILITY: '波动率',
-  SYSTEM: '系统',
-};
 
 function formatTime(sec: number): string {
   return new Date(sec * 1000).toLocaleTimeString('zh-CN', {
@@ -41,12 +34,16 @@ function formatTime(sec: number): string {
   });
 }
 
+function getAlertKey(alert: SystemAlertMsg): string {
+  return `${alert.component}-${alert.timestamp}`;
+}
+
 export function RiskMonitorPage() {
   useAlerts();
 
   const alerts = useMonitorStore((state) => state.alerts);
-  const [levelFilter, setLevelFilter] = useState<LevelFilter>('ALL');
-  const [acknowledgedIds, setAcknowledgedIds] = useState<Set<string>>(new Set());
+  const [alertFilter, setAlertFilter] = useState<AlertFilter>('ALL');
+  const [acknowledgedKeys, setAcknowledgedKeys] = useState<Set<string>>(new Set());
 
   const todayAlerts = useMemo(() => {
     const now = new Date();
@@ -56,11 +53,11 @@ export function RiskMonitorPage() {
 
   const stats = useMemo(() => {
     const total = todayAlerts.length;
-    const critical = todayAlerts.filter((a) => a.level === 'CRITICAL').length;
-    const warning = todayAlerts.filter((a) => a.level === 'HIGH' || a.level === 'MEDIUM').length;
-    const acknowledged = todayAlerts.filter((a) => acknowledgedIds.has(a.alert_id)).length;
+    const critical = todayAlerts.filter((a) => a.alert_type === 'CRITICAL').length;
+    const warning = todayAlerts.filter((a) => a.alert_type === 'ERROR' || a.alert_type === 'WARNING').length;
+    const acknowledged = todayAlerts.filter((a) => acknowledgedKeys.has(getAlertKey(a))).length;
     return { total, critical, warning, acknowledged };
-  }, [todayAlerts, acknowledgedIds]);
+  }, [todayAlerts, acknowledgedKeys]);
 
   const trendData = useMemo(
     () =>
@@ -72,12 +69,12 @@ export function RiskMonitorPage() {
   );
 
   const filteredAlerts = useMemo(() => {
-    if (levelFilter === 'ALL') return alerts;
-    return alerts.filter((a) => a.level === levelFilter);
-  }, [alerts, levelFilter]);
+    if (alertFilter === 'ALL') return alerts;
+    return alerts.filter((a) => a.alert_type === alertFilter);
+  }, [alerts, alertFilter]);
 
-  const handleAcknowledge = (alert: RiskAlertMsg) => {
-    setAcknowledgedIds((prev) => new Set(prev).add(alert.alert_id));
+  const handleAcknowledge = (alert: SystemAlertMsg) => {
+    setAcknowledgedKeys((prev) => new Set(prev).add(getAlertKey(alert)));
     notification.success({
       message: '告警已确认',
       description: alert.message,
@@ -85,7 +82,7 @@ export function RiskMonitorPage() {
     });
   };
 
-  const handleIgnore = (_alert: RiskAlertMsg) => {
+  const handleIgnore = (_alert: SystemAlertMsg) => {
     // 占位：无实际操作
   };
 
@@ -99,19 +96,16 @@ export function RiskMonitorPage() {
     },
     {
       title: '级别',
-      dataIndex: 'level',
-      key: 'level',
-      render: (level: string) => <AlertBadge level={level} />,
+      dataIndex: 'alert_type',
+      key: 'alert_type',
+      render: (type: string) => <AlertBadge level={type} />,
       width: 80,
     },
     {
-      title: '类型',
-      dataIndex: 'alert_type',
-      key: 'alert_type',
-      render: (type: RiskAlertMsg['alert_type']) => (
-        <Tag>{TYPE_LABEL[type] || type}</Tag>
-      ),
-      width: 80,
+      title: '组件',
+      dataIndex: 'component',
+      key: 'component',
+      width: 120,
     },
     {
       title: '描述',
@@ -120,40 +114,21 @@ export function RiskMonitorPage() {
       ellipsis: true,
     },
     {
-      title: '当前值 / 阈值',
-      key: 'value_threshold',
-      render: (_: unknown, record: RiskAlertMsg) => (
-        <span>
-          {record.current_value.toFixed(2)} / {record.threshold.toFixed(2)}
-        </span>
-      ),
-      width: 140,
-    },
-    {
-      title: '关联策略',
-      dataIndex: 'affected_strategies',
-      key: 'affected_strategies',
-      render: (strategies: string[]) => (
-        <span style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {strategies.map((s) => (
-            <Tag key={s}>
-              {s}
-            </Tag>
-          ))}
-        </span>
-      ),
-      width: 160,
+      title: '详情',
+      dataIndex: 'details',
+      key: 'details',
+      ellipsis: true,
     },
     {
       title: '操作',
       key: 'action',
-      render: (_: unknown, record: RiskAlertMsg) => (
+      render: (_: unknown, record: SystemAlertMsg) => (
         <span style={{ display: 'flex', gap: 8 }}>
           <Button
             size="small"
             icon={<CheckOutlined />}
             onClick={() => handleAcknowledge(record)}
-            disabled={acknowledgedIds.has(record.alert_id)}
+            disabled={acknowledgedKeys.has(getAlertKey(record))}
           >
             确认
           </Button>
@@ -208,14 +183,14 @@ export function RiskMonitorPage() {
             const count =
               opt.key === 'ALL'
                 ? alerts.length
-                : alerts.filter((a) => a.level === opt.key).length;
-            const active = levelFilter === opt.key;
+                : alerts.filter((a) => a.alert_type === opt.key).length;
+            const active = alertFilter === opt.key;
             return (
               <Tag
                 key={opt.key}
                 color={active ? 'blue' : undefined}
                 style={{ cursor: 'pointer' }}
-                onClick={() => setLevelFilter(opt.key)}
+                onClick={() => setAlertFilter(opt.key)}
               >
                 {opt.label} ({count})
               </Tag>
@@ -226,10 +201,9 @@ export function RiskMonitorPage() {
         <Table
           dataSource={filteredAlerts}
           columns={columns}
-          rowKey="alert_id"
+          rowKey={(record) => getAlertKey(record)}
           size="small"
           pagination={{ pageSize: 20 }}
-          scroll={{ x: 'max-content' }}
         />
       </Card>
     </div>

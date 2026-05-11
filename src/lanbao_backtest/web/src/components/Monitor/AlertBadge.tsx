@@ -2,9 +2,9 @@ import { Tag } from 'antd';
 
 const LEVEL_MAP: Record<string, { color: string; label: string }> = {
   CRITICAL: { color: 'red', label: '严重' },
-  HIGH: { color: 'orange', label: '高' },
-  MEDIUM: { color: 'gold', label: '中' },
-  LOW: { color: 'blue', label: '低' },
+  ERROR: { color: 'orange', label: '错误' },
+  WARNING: { color: 'gold', label: '警告' },
+  INFO: { color: 'blue', label: '信息' },
 };
 
 interface AlertBadgeProps {

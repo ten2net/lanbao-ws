@@ -7,7 +7,7 @@ import { useAlerts } from '../hooks/useAlerts';
 import { KPIGrid } from '../components/Monitor/KPIGrid';
 import { MetricChart } from '../components/Monitor/MetricChart';
 import { StatusPieChart } from '../components/Monitor/StatusPieChart';
-import type { NodeStatusMsg, RiskAlertMsg } from '../types/ros2';
+import type { NodeStatusMsg, SystemAlertMsg } from '../types/ros2';
 
 function formatTime(sec: number): string {
   return new Date(sec * 1000).toLocaleTimeString('zh-CN', {
@@ -17,15 +17,15 @@ function formatTime(sec: number): string {
   });
 }
 
-function getAlertColor(level: RiskAlertMsg['level']): string {
-  switch (level) {
+function getAlertColor(type: SystemAlertMsg['alert_type']): string {
+  switch (type) {
     case 'CRITICAL':
       return 'red';
-    case 'HIGH':
+    case 'ERROR':
       return 'orange';
-    case 'MEDIUM':
+    case 'WARNING':
       return 'gold';
-    case 'LOW':
+    case 'INFO':
     default:
       return 'blue';
   }
@@ -122,11 +122,11 @@ export function SystemOverviewPage() {
               renderItem={(item) => (
                 <List.Item>
                   <List.Item.Meta
-                    avatar={<Badge color={getAlertColor(item.level)} />}
+                    avatar={<Badge color={getAlertColor(item.alert_type)} />}
                     title={
                       <span>
-                        <Tag color={getAlertColor(item.level)}>{item.level}</Tag>
-                        {item.alert_type}
+                        <Tag color={getAlertColor(item.alert_type)}>{item.alert_type}</Tag>
+                        {item.component}
                       </span>
                     }
                     description={

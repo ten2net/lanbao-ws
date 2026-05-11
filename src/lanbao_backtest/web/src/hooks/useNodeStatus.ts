@@ -16,5 +16,5 @@ export function useNodeStatus(): void {
     [setNodes],
   );
 
-  useROSTopic<NodeStatusMsg>('/node/status', onMessage);
+  useROSTopic<NodeStatusMsg>('/node_status', onMessage);
 }

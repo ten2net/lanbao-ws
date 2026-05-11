@@ -1,12 +1,12 @@
 import { create } from 'zustand';
-import type { NodeStatusMsg, RiskAlertMsg, SystemMetricsMsg } from '../types/ros2';
+import type { NodeStatusMsg, SystemAlertMsg, SystemMetricsMsg } from '../types/ros2';
 
 interface MonitorState {
   nodes: NodeStatusMsg[];
-  alerts: RiskAlertMsg[];
+  alerts: SystemAlertMsg[];
   metricsHistory: SystemMetricsMsg[];
   setNodes: (updater: (prev: NodeStatusMsg[]) => NodeStatusMsg[]) => void;
-  setAlerts: (updater: (prev: RiskAlertMsg[]) => RiskAlertMsg[]) => void;
+  setAlerts: (updater: (prev: SystemAlertMsg[]) => SystemAlertMsg[]) => void;
   addMetric: (metric: SystemMetricsMsg) => void;
 }
 

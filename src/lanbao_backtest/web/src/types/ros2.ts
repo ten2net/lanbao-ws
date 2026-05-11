@@ -35,14 +35,11 @@ export interface NodeStatusMsg {
   timestamp: number;
 }
 
-export interface RiskAlertMsg {
+export interface SystemAlertMsg {
   header: { stamp: { sec: number; nanosec: number } };
-  alert_id: string;
-  alert_type: 'POSITION' | 'DRAWDOWN' | 'VOLATILITY' | 'SYSTEM';
-  level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  alert_type: 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
+  component: string;
   message: string;
-  current_value: number;
-  threshold: number;
-  affected_strategies: string[];
+  details: string;
   timestamp: number;
 }

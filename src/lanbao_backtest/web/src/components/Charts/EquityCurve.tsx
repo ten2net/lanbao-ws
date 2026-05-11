@@ -54,10 +54,20 @@ export function EquityCurve({ data, showDrawdown = false }: Props) {
           minTickGap={40}
         />
         <YAxis
+          yAxisId="left"
           tick={{ fontSize: 11 }}
           tickFormatter={(v: number) => `${(v / 10000).toFixed(1)}万`}
           width={60}
         />
+        {showDrawdown && (
+          <YAxis
+            yAxisId="right"
+            orientation="right"
+            tick={{ fontSize: 11 }}
+            tickFormatter={(v: number) => `${v.toFixed(1)}%`}
+            width={50}
+          />
+        )}
         <Tooltip
           formatter={(value: number, name: string) => {
             if (name === 'equity') return [`${value.toFixed(2)}`, '权益'];
@@ -69,6 +79,7 @@ export function EquityCurve({ data, showDrawdown = false }: Props) {
         <Area
           type="monotone"
           dataKey="equity"
+          yAxisId="left"
           stroke="#1677ff"
           strokeWidth={2}
           fill="url(#equityGradient)"
@@ -83,7 +94,7 @@ export function EquityCurve({ data, showDrawdown = false }: Props) {
             strokeWidth={1}
             fill="none"
             dot={false}
-            yAxisId={1}
+            yAxisId="right"
           />
         )}
       </AreaChart>

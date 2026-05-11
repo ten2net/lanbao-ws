@@ -1,0 +1,56 @@
+{
+  "schema_version": "2.0",
+  "backtest_id": "bt_ma_cross_20260511_110415",
+  "meta": {
+    "strategy_id": "ma_cross",
+    "strategy_name": "ma_cross",
+    "strategy_params": {},
+    "symbol": "000002.SZ",
+    "start_date": "2026-05-06",
+    "end_date": "2026-05-08",
+    "total_trading_days": 3,
+    "created_at": "2026-05-11T11:04:15.200877",
+    "duration_seconds": 0,
+    "status": "completed",
+    "tags": []
+  },
+  "performance": {
+    "returns": {
+      "total_return_pct": 0.0,
+      "annual_return_pct": 0.0,
+      "daily_return_mean_pct": 0.0,
+      "daily_return_std_pct": 0.0,
+      "best_day_pct": 0.0,
+      "worst_day_pct": 0.0,
+      "positive_days": 0,
+      "negative_days": 0
+    },
+    "risk": {
+      "sharpe_ratio": 0,
+      "sortino_ratio": 0,
+      "max_drawdown_pct": 0.0,
+      "max_drawdown_duration_days": 0,
+      "volatility_annual_pct": 0.0,
+      "var_95_pct": 0.0,
+      "calmar_ratio": 0
+    },
+    "trades": {
+      "total_count": 0,
+      "winning_count": 0,
+      "losing_count": 0,
+      "win_rate_pct": 0,
+      "profit_factor": 0,
+      "avg_trade_return_pct": 0,
+      "avg_win_pct": 0,
+      "avg_loss_pct": 0,
+      "largest_win_pct": 0.0,
+      "largest_loss_pct": 0.0,
+      "avg_holding_days": 0
+    }
+  },
+  "files": {
+    "equity": "bt_ma_cross_20260511_110415.equity.json",
+    "trades": "bt_ma_cross_20260511_110415.trades.json",
+    "monthly": "bt_ma_cross_20260511_110415.monthly.json"
+  }
+}

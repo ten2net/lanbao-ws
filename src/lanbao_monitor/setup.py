@@ -20,6 +20,7 @@ setup(
     entry_points={
         'console_scripts': [
             'monitor_node = lanbao_monitor.monitor_node:main',
+            'system_metrics_node = lanbao_monitor.system_metrics_node:main',
         ],
     },
 )

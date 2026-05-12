@@ -9,11 +9,16 @@ from typing import Any, Dict, List, Optional
 def _get_reports_dir() -> Path:
     """获取报告目录（基于项目根目录）"""
     current = Path(__file__).resolve()
+    # 向上遍历，找到包含标志性文件/目录的项目根目录
+    # 使用 config/ 或 pyproject.toml 作为项目根目录的标志
     project_root = current.parent.parent.parent.parent
-    # storage.py 在 src/lanbao_backtest/api/services/ 下，parent x4 得到 src/
-    # 回测引擎在 build/ 或 src/ 下，parent x4 得到项目根目录
-    # 统一修正：若当前在 src/ 内则向上到项目根目录
-    if project_root.name == "src" and (project_root.parent / "reports").exists():
+    while project_root != project_root.parent:
+        if (project_root / "config").is_dir() or (project_root / "pyproject.toml").exists():
+            break
+        if project_root.name in ("src", "build"):
+            project_root = project_root.parent
+            if (project_root / "config").is_dir() or (project_root / "pyproject.toml").exists():
+                break
         project_root = project_root.parent
     reports_dir = project_root / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)

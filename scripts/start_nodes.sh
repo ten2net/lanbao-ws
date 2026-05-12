@@ -32,6 +32,37 @@ LANBAO_INSTALL_PATHS="./install/lanbao_interfaces/lib/python3.10/site-packages:.
 # build目录包含实际的包代码(.egg-link指向这里)
 LANBAO_BUILD_PATHS="./build/lanbao_interfaces:./build/lanbao_core:./build/lanbao_data:./build/lanbao_strategy:./build/lanbao_backtest:./build/lanbao_risk:./build/lanbao_monitor"
 
+# 停止已运行的同名节点
+stop_existing() {
+    local node_name=$1
+    local pids
+
+    case "$node_name" in
+        "market_data") pids=$(pgrep -f "lanbao_data\.market_data_node") ;;
+        "data_sync") pids=$(pgrep -f "lanbao_data\.data_sync_node") ;;
+        "backtest") pids=$(pgrep -f "lanbao_backtest\.backtest_engine_node") ;;
+        "strategy") pids=$(pgrep -f "lanbao_strategy\.strategy_manager_node") ;;
+        "risk") pids=$(pgrep -f "lanbao_risk\.risk_control_node") ;;
+        "monitor") pids=$(pgrep -f "lanbao_monitor\.monitor_node") ;;
+        "system_metrics") pids=$(pgrep -f "lanbao_monitor\.system_metrics_node") ;;
+        "rosbridge_server") pids=$(pgrep -f "rosbridge_websocket_launch") ;;
+    esac
+
+    if [ -n "$pids" ]; then
+        echo -e "${YELLOW}  发现已运行的 $node_name，先停止旧进程...${NC}"
+        for pid in $pids; do
+            kill "$pid" 2>/dev/null
+        done
+        sleep 1
+        # 强制清理仍未停止的
+        for pid in $pids; do
+            if kill -0 "$pid" 2>/dev/null; then
+                kill -9 "$pid" 2>/dev/null
+            fi
+        done
+    fi
+}
+
 # 启动函数
 start_node() {
     local node_name=$1
@@ -39,6 +70,12 @@ start_node() {
     local module=$3
 
     echo -e "${BLUE}启动 $node_name...${NC}"
+
+    # 先停止已存在的同名节点
+    stop_existing "$node_name"
+
+    # 清理旧 pid 文件
+    rm -f "logs/${node_name}.pid"
 
     # 创建启动脚本
     cat > "logs/${node_name}_launcher.sh" << EOF
@@ -63,6 +100,10 @@ EOF
 # 启动 ROS2 WebSocket 桥接 (rosbridge_server)
 start_rosbridge() {
     echo -e "${BLUE}启动 rosbridge_server (WebSocket: ws://localhost:9090)...${NC}"
+
+    # 先停止已存在的 rosbridge
+    stop_existing "rosbridge_server"
+    rm -f "logs/rosbridge_server.pid"
 
     cat > "logs/rosbridge_launcher.sh" << 'EOF'
 #!/bin/bash

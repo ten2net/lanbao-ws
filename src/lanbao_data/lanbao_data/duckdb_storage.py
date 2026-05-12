@@ -417,10 +417,19 @@ class DuckDBStorage:
                 return False
             
             df = data.copy()
-            
+
+            # 处理 list_date 格式转换（兼容 YYYYMMDD 字符串或整数）
+            if 'list_date' in df.columns:
+                df['list_date'] = pd.to_datetime(df['list_date'], format='%Y%m%d', errors='coerce').dt.date
+
+            # 只保留需要的列，避免多余列导致映射问题
+            required_cols = ['symbol', 'name', 'industry', 'market', 'list_date']
+            available_cols = [c for c in required_cols if c in df.columns]
+            df = df[available_cols]
+
             # 插入或更新
             self._conn.execute("""
-                INSERT OR REPLACE INTO stock_info 
+                INSERT OR REPLACE INTO stock_info
                 SELECT symbol, name, industry, market, list_date, CURRENT_TIMESTAMP
                 FROM df
             """)
@@ -545,6 +554,13 @@ class DuckDBStorage:
     def close(self):
         """关闭数据库连接并释放文件锁"""
         if self._conn:
+            try:
+                # 写入连接关闭前显式 checkpoint，确保 WAL 数据写入主文件，
+                # 这样其他进程的只读连接才能立即看到最新数据
+                if not self._read_only:
+                    self._conn.execute("CHECKPOINT")
+            except Exception:
+                pass
             self._conn.close()
             self._conn = None
             logger.info("DuckDB连接已关闭")

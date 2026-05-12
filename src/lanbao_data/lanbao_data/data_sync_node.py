@@ -288,6 +288,12 @@ class DataSyncNode(LanBaoBaseNode):
             # 步骤4: 更新交易日历（使用写入连接）
             self._update_trade_calendar(write_storage)
 
+            # 步骤4b: 保存股票基本信息
+            try:
+                write_storage.save_stock_info(stock_list)
+            except Exception as e:
+                logger.warning(f"保存股票基本信息失败: {e}")
+
             # 步骤5: 执行批量下载和写入
             write_storage.update_sync_status(
                 status='running',

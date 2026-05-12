@@ -19,6 +19,7 @@ import type { NodeStatusMsg } from '../types/ros2';
 
 const STATUS_COLOR: Record<NodeStatusMsg['status'], string> = {
   RUNNING: 'green',
+  SYNCING: 'cyan',
   INITIALIZING: 'blue',
   ERROR: 'red',
   STOPPED: 'default',
@@ -26,9 +27,20 @@ const STATUS_COLOR: Record<NodeStatusMsg['status'], string> = {
 
 const STATUS_LABEL: Record<NodeStatusMsg['status'], string> = {
   RUNNING: '运行中',
+  SYNCING: '同步中',
   INITIALIZING: '初始化中',
   ERROR: '错误',
   STOPPED: '已停止',
+};
+
+const NODE_NAME_CN: Record<string, string> = {
+  market_data_node: '市场数据节点',
+  data_sync_node: '数据同步节点',
+  backtest_engine_node: '回测引擎节点',
+  strategy_manager_node: '策略管理节点',
+  risk_control_node: '风险控制节点',
+  monitor_node: '监控节点',
+  system_metrics_node: '系统指标节点',
 };
 
 type StatusFilter = 'ALL' | NodeStatusMsg['status'];
@@ -36,6 +48,7 @@ type StatusFilter = 'ALL' | NodeStatusMsg['status'];
 const FILTER_OPTIONS: { key: StatusFilter; label: string }[] = [
   { key: 'ALL', label: '全部' },
   { key: 'RUNNING', label: '运行中' },
+  { key: 'SYNCING', label: '同步中' },
   { key: 'INITIALIZING', label: '初始化中' },
   { key: 'ERROR', label: '错误' },
   { key: 'STOPPED', label: '已停止' },
@@ -74,7 +87,7 @@ export function NodeStatusPage() {
       const lower = searchText.trim().toLowerCase();
       result = result.filter((n) => n.node_name.toLowerCase().includes(lower));
     }
-    return result.sort((a, b) => b.timestamp - a.timestamp);
+    return result.sort((a, b) => a.node_name.localeCompare(b.node_name));
   }, [nodes, statusFilter, searchText]);
 
   const selectedNode = useMemo(
@@ -154,7 +167,12 @@ export function NodeStatusPage() {
                         marginBottom: 8,
                       }}
                     >
-                      <span style={{ fontWeight: 500 }}>{node.node_name}</span>
+                      <div>
+                        <span style={{ fontWeight: 500 }}>{node.node_name}</span>
+                        <span style={{ marginLeft: 8, color: '#888', fontSize: 12 }}>
+                          {NODE_NAME_CN[node.node_name] || node.node_type}
+                        </span>
+                      </div>
                       <Badge
                         status={STATUS_COLOR[node.status] as any}
                         text={STATUS_LABEL[node.status]}

@@ -46,10 +46,51 @@ source install/setup.bash
 ros2 run lanbao_data market_data_node
 ```
 
-**Docker:**
+**Docker Compose 部署:**
+
+生产环境（基于镜像，不挂载源码）：
 ```bash
-docker-compose up -d
+# 1. 复制环境变量配置
+cp .env.example .env
+# 编辑 .env 填写 TUSHARE_TOKEN 等配置
+
+# 2. 构建镜像
+docker compose build
+
+# 3. 启动所有服务
+docker compose up -d
+
+# 4. 查看服务状态
+docker compose ps
+
+# 5. 查看日志
+docker compose logs -f lanbao-core
+docker compose logs -f market-data
+
+# 6. 停止服务
+docker compose down
 ```
+
+开发环境（挂载源码，支持实时修改）：
+```bash
+# 注意：源码修改后需要重新构建镜像以更新 install/ 目录
+docker compose -f docker-compose.dev.yml build
+docker compose -f docker-compose.dev.yml up -d
+```
+
+Docker 服务清单：
+| 服务 | 容器名 | 端口 | 说明 |
+|------|--------|------|------|
+| lanbao-core | lanbao-core | 9090 | core_node + rosbridge WebSocket |
+| market-data | lanbao-market-data | — | 市场数据节点 |
+| data-sync | lanbao-data-sync | — | 数据同步节点 |
+| backtest-engine | lanbao-backtest | — | 回测引擎节点 |
+| strategy-manager | lanbao-strategy | — | 策略管理节点 |
+| risk-control | lanbao-risk | — | 风险控制节点 |
+| monitor | lanbao-monitor | — | 监控节点 |
+| system-metrics | lanbao-system-metrics | — | 系统指标节点 |
+| jupyter | lanbao-jupyter | 8888 | Jupyter Lab 研究环境 |
+| web | lanbao-web | 8501 | Streamlit 监控面板 |
 
 ## Testing
 

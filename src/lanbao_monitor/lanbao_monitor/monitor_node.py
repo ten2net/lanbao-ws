@@ -9,7 +9,7 @@ from datetime import datetime
 from loguru import logger
 
 from lanbao_core import LanBaoBaseNode, NodeConfig
-from lanbao_interfaces.msg import NodeStatus, SystemAlert
+from lanbao_interfaces.msg import NodeStatus, SystemAlert, SystemMetrics
 from lanbao_interfaces.srv import GetNodeStatus
 
 
@@ -65,7 +65,15 @@ class MonitorNode(LanBaoBaseNode):
                 self._on_system_alert,
                 10
             )
-            
+
+            # 订阅系统指标（用于检测 system_metrics_node 是否在线）
+            self._metrics_subscription = self.create_subscription(
+                SystemMetrics,
+                '/system/metrics',
+                self._on_system_metrics,
+                10
+            )
+
             # 设置服务
             self._setup_services()
             
@@ -125,7 +133,21 @@ class MonitorNode(LanBaoBaseNode):
         self._persist_alerts()
 
         logger.warning(f"[系统告警] [{msg.alert_type}] {msg.component}: {msg.message}")
-    
+
+    def _on_system_metrics(self, msg: SystemMetrics):
+        """接收系统指标消息，将 system_metrics_node 加入节点状态缓存"""
+        import time
+        ts_ms = int(time.time() * 1000)
+        self._node_statuses['system_metrics_node'] = {
+            'node_type': 'system_metrics',
+            'status': 'RUNNING',
+            'cpu_usage': msg.cpu_percent,
+            'memory_usage': msg.memory_percent,
+            'message_count': 0,
+            'last_error': '',
+            'timestamp': ts_ms
+        }
+
     def _persist_alerts(self):
         """将告警持久化到 JSON 文件"""
         try:

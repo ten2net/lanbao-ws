@@ -152,6 +152,8 @@ function getNodeStatusLabel(status: NodeStatusMsg['status']): string {
   switch (status) {
     case 'RUNNING':
       return '运行中';
+    case 'SYNCING':
+      return '同步中';
     case 'ERROR':
       return '错误';
     case 'INITIALIZING':

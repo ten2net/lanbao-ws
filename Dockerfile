@@ -1,5 +1,9 @@
 # 揽宝智能投研交易平台 - Docker镜像
+# 支持通过 --build-arg PIP_INDEX_URL=xxx 指定 PyPI 镜像
 FROM ros:humble-ros-base-jammy
+
+ARG PIP_INDEX_URL=""
+ENV PIP_INDEX_URL=${PIP_INDEX_URL}
 
 # 设置工作目录
 WORKDIR /workspace
@@ -19,12 +23,16 @@ RUN apt-get update && apt-get install -y \
     htop \
     && rm -rf /var/lib/apt/lists/*
 
-# 安装Python依赖
+# 安装Python依赖（利用Docker缓存层：仅 requirements.txt 变更时重新安装）
 COPY requirements.txt /workspace/
-RUN pip3 install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+RUN if [ -n "$PIP_INDEX_URL" ]; then \
+        pip3 install --no-cache-dir -r requirements.txt -i "$PIP_INDEX_URL"; \
+    else \
+        pip3 install --no-cache-dir -r requirements.txt; \
+    fi
 
 # 创建工作目录
-RUN mkdir -p /workspace/src /workspace/data /workspace/logs /workspace/config
+RUN mkdir -p /workspace/src /workspace/data /workspace/logs /workspace/config /workspace/notebooks
 
 # 复制项目代码
 COPY src/ /workspace/src/
@@ -37,19 +45,28 @@ ENV PYTHONPATH="/workspace/src:/opt/ros/humble/lib/python3.10/site-packages:/opt
 ENV ROS_DOMAIN_ID=0
 ENV LANBAO_LOG_LEVEL=INFO
 
-# 构建ROS2包
+# 构建ROS2包（产物固化在镜像中，不再被挂载覆盖）
 RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
     cd /workspace && \
-    colcon build --packages-select lanbao_interfaces lanbao_core lanbao_data lanbao_strategy lanbao_backtest lanbao_risk lanbao_monitor"
+    colcon build --packages-select \
+        lanbao_interfaces \
+        lanbao_core \
+        lanbao_data \
+        lanbao_strategy \
+        lanbao_backtest \
+        lanbao_risk \
+        lanbao_monitor \
+        --symlink-install"
 
 # 复制启动脚本
 COPY entrypoint.sh /workspace/entrypoint.sh
 RUN chmod +x /workspace/entrypoint.sh
 
 # 暴露端口
-# 8888 - Jupyter, 8501 - Streamlit
+# 8888 - Jupyter, 8501 - Streamlit, 9090 - rosbridge WebSocket
 EXPOSE 8888
 EXPOSE 8501
+EXPOSE 9090
 
 # 入口点
 ENTRYPOINT ["/workspace/entrypoint.sh"]

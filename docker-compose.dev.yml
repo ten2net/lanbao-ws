@@ -1,9 +1,13 @@
-# 揽宝智能投研交易平台 - Docker Compose 生产配置
+# 揽宝智能投研交易平台 - Docker Compose 开发配置
+# 开发模式：挂载源码目录，支持实时修改和调试
+#
 # 使用方式:
-#   docker compose build          # 构建镜像
-#   docker compose up -d          # 启动所有服务
-#   docker compose logs -f        # 查看日志
-#   docker compose down           # 停止并移除服务
+#   docker compose -f docker-compose.dev.yml build      # 构建镜像
+#   docker compose -f docker-compose.dev.yml up -d      # 启动所有服务
+#   docker compose -f docker-compose.dev.yml logs -f    # 查看日志
+#   docker compose -f docker-compose.dev.yml down       # 停止并移除服务
+#
+# 注意: 首次启动或源码变更后，需要重新构建镜像以更新 install/ 目录
 
 services:
   # 核心服务: core_node + rosbridge WebSocket
@@ -18,6 +22,7 @@ services:
       - TUSHARE_TOKEN=${TUSHARE_TOKEN}
       - LANBAO_LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
+      - .:/workspace
       - ./data:/workspace/data
       - ./logs:/workspace/logs
       - ./config:/workspace/config
@@ -39,6 +44,7 @@ services:
       - QMT_PATH=${QMT_PATH}
       - QMT_ACCOUNT_ID=${QMT_ACCOUNT_ID}
     volumes:
+      - .:/workspace
       - ./data:/workspace/data
       - ./logs:/workspace/logs
     networks:
@@ -56,6 +62,7 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - TUSHARE_TOKEN=${TUSHARE_TOKEN}
     volumes:
+      - .:/workspace
       - ./data:/workspace/data
       - ./logs:/workspace/logs
     networks:
@@ -73,6 +80,7 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     volumes:
+      - .:/workspace
       - ./data:/workspace/data
       - ./logs:/workspace/logs
     networks:
@@ -90,6 +98,7 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     volumes:
+      - .:/workspace
       - ./data:/workspace/data
       - ./config:/workspace/config
       - ./logs:/workspace/logs
@@ -108,6 +117,7 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     volumes:
+      - .:/workspace
       - ./data:/workspace/data
       - ./logs:/workspace/logs
     networks:
@@ -125,6 +135,7 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     volumes:
+      - .:/workspace
       - ./data:/workspace/data
       - ./logs:/workspace/logs
     networks:
@@ -141,6 +152,7 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     volumes:
+      - .:/workspace
       - ./data:/workspace/data
       - ./logs:/workspace/logs
     networks:
@@ -160,6 +172,7 @@ services:
       - TUSHARE_TOKEN=${TUSHARE_TOKEN}
       - PYTHONPATH=/workspace/src:/workspace/install
     volumes:
+      - .:/workspace
       - ./data:/workspace/data
       - ./notebooks:/workspace/notebooks
       - ./config:/workspace/config
@@ -181,6 +194,7 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     volumes:
+      - .:/workspace
       - ./data:/workspace/data
       - ./config:/workspace/config
       - ./src:/workspace/src

@@ -27,7 +27,7 @@ export interface NodeStatusMsg {
   header: { stamp: { sec: number; nanosec: number } };
   node_name: string;
   node_type: string;
-  status: 'INITIALIZING' | 'RUNNING' | 'ERROR' | 'STOPPED';
+  status: 'INITIALIZING' | 'RUNNING' | 'SYNCING' | 'ERROR' | 'STOPPED';
   cpu_usage: number;
   memory_usage: number;
   message_count: number;

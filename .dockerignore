@@ -45,7 +45,7 @@ data/*
 logs/*
 !logs/.gitkeep
 
-# ROS2
+# ROS2 构建产物（镜像内会重新构建，无需复制宿主机产物）
 install/
 log/
 build/
@@ -63,3 +63,8 @@ Thumbs.db
 .env
 *.key
 *.pem
+
+# Docker 自身
+docker-compose*.yml
+Dockerfile
+.dockerignore

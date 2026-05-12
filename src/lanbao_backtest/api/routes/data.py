@@ -2,6 +2,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Path, Query
 from loguru import logger
 
+from lanbao_data.duckdb_lock import db_lock
 from ..models import DataSummary, DataTableInfo, SyncTask, QualityReport, TablePreviewResponse, ColumnInfo
 from ..ros2_client import get_ros2_manager
 
@@ -45,40 +46,32 @@ def _get_duckdb_path() -> str:
     return str(db_path)
 
 
-def _query_db(query: str, params: Optional[list] = None, max_retries: int = 30):
-    """执行 DuckDB 查询（带锁等待重试，最长约60秒）"""
+def _query_db(query: str, params: Optional[list] = None):
+    """执行 DuckDB 查询（通过文件锁协调多进程访问）"""
     import duckdb
-    import time
-    db_path = _get_duckdb_path()
 
-    for attempt in range(max_retries):
-        conn = None
-        try:
+    db_path = _get_duckdb_path()
+    conn = None
+    try:
+        with db_lock(db_path, mode="shared", timeout=60.0):
             conn = duckdb.connect(db_path, read_only=True)
             if params:
                 result = conn.execute(query, params).fetchall()
             else:
                 result = conn.execute(query).fetchall()
             return result
-        except Exception as e:
-            error_msg = str(e).lower()
-            if "lock" in error_msg or "conflicting" in error_msg or "busy" in error_msg:
-                if attempt < max_retries - 1:
-                    logger.debug(
-                        f"数据库被锁定，等待重试... ({attempt + 1}/{max_retries})"
-                    )
-                    time.sleep(2)
-                    continue
-            logger.error(f"DuckDB 查询失败: {e}")
-            return []
-        finally:
-            if conn:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-
-    return []
+    except TimeoutError as e:
+        logger.warning(f"获取数据库读锁超时: {e}")
+        return []
+    except Exception as e:
+        logger.error(f"DuckDB 查询失败: {e}")
+        return []
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 # ── 缓存刷新逻辑 ──
@@ -151,89 +144,90 @@ def _refresh_tables_cache() -> List[DataTableInfo]:
     """从 DuckDB 刷新表列表缓存"""
     tables = []
     db_path = _get_duckdb_path()
-    conn = None
     try:
         import duckdb
-        conn = duckdb.connect(db_path, read_only=True)
-
-        table_rows = conn.execute(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
-        ).fetchall()
-
-        for (table_name,) in table_rows:
+        with db_lock(db_path, mode="shared", timeout=60.0):
+            conn = duckdb.connect(db_path, read_only=True)
             try:
-                count_result = conn.execute(
-                    f"SELECT COUNT(*) FROM {table_name}"
-                ).fetchone()
-                record_count = count_result[0] if count_result else 0
+                table_rows = conn.execute(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
+                ).fetchall()
 
-                date_start = None
-                date_end = None
-                try:
-                    cols = conn.execute(
-                        f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'"
-                    ).fetchall()
-                    col_names = [c[0] for c in cols]
-                    if "date" in col_names:
-                        range_result = conn.execute(
-                            f"SELECT MIN(date), MAX(date) FROM {table_name}"
-                        ).fetchone()
-                        date_start = (
-                            str(range_result[0])
-                            if range_result and range_result[0]
-                            else None
-                        )
-                        date_end = (
-                            str(range_result[1])
-                            if range_result and range_result[1]
-                            else None
-                        )
-                except Exception:
-                    pass
-
-                quality_score = 100.0
-                if record_count > 0:
+                for (table_name,) in table_rows:
                     try:
-                        cols = conn.execute(
-                            f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'"
-                        ).fetchall()
-                        null_counts = []
-                        for (col_name,) in cols:
-                            if col_name in ("created_at", "updated_at", "data_source"):
-                                continue
-                            try:
-                                null_result = conn.execute(
-                                    f"SELECT COUNT(*) FROM {table_name} WHERE {col_name} IS NULL"
+                        count_result = conn.execute(
+                            f"SELECT COUNT(*) FROM {table_name}"
+                        ).fetchone()
+                        record_count = count_result[0] if count_result else 0
+
+                        date_start = None
+                        date_end = None
+                        try:
+                            cols = conn.execute(
+                                f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'"
+                            ).fetchall()
+                            col_names = [c[0] for c in cols]
+                            if "date" in col_names:
+                                range_result = conn.execute(
+                                    f"SELECT MIN(date), MAX(date) FROM {table_name}"
                                 ).fetchone()
-                                null_counts.append(null_result[0])
+                                date_start = (
+                                    str(range_result[0])
+                                    if range_result and range_result[0]
+                                    else None
+                                )
+                                date_end = (
+                                    str(range_result[1])
+                                    if range_result and range_result[1]
+                                    else None
+                                )
+                        except Exception:
+                            pass
+
+                        quality_score = 100.0
+                        if record_count > 0:
+                            try:
+                                cols = conn.execute(
+                                    f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'"
+                                ).fetchall()
+                                null_counts = []
+                                for (col_name,) in cols:
+                                    if col_name in ("created_at", "updated_at", "data_source"):
+                                        continue
+                                    try:
+                                        null_result = conn.execute(
+                                            f"SELECT COUNT(*) FROM {table_name} WHERE {col_name} IS NULL"
+                                        ).fetchone()
+                                        null_counts.append(null_result[0])
+                                    except Exception:
+                                        pass
+                                total_nulls = sum(null_counts)
+                                if total_nulls > 0:
+                                    quality_score = max(
+                                        0.0, 100.0 - (total_nulls / record_count) * 100
+                                    )
                             except Exception:
                                 pass
-                        total_nulls = sum(null_counts)
-                        if total_nulls > 0:
-                            quality_score = max(
-                                0.0, 100.0 - (total_nulls / record_count) * 100
+
+                        tables.append(
+                            DataTableInfo(
+                                name=table_name,
+                                record_count=record_count,
+                                date_start=date_start,
+                                date_end=date_end,
+                                last_updated=None,
+                                quality_score=round(quality_score, 1),
                             )
-                    except Exception:
-                        pass
+                        )
+                    except Exception as e:
+                        logger.warning(f"处理表 {table_name} 失败: {e}")
+            finally:
+                conn.close()
 
-                tables.append(
-                    DataTableInfo(
-                        name=table_name,
-                        record_count=record_count,
-                        date_start=date_start,
-                        date_end=date_end,
-                        last_updated=None,
-                        quality_score=round(quality_score, 1),
-                    )
-                )
-            except Exception as e:
-                logger.warning(f"处理表 {table_name} 失败: {e}")
-
+    except TimeoutError as e:
+        logger.warning(f"刷新表列表缓存时获取读锁超时: {e}")
     except Exception as e:
         logger.error(f"刷新表列表缓存失败: {e}")
-    finally:
-        if conn:
-            conn.close()
 
     if tables:
         _data_cache["tables"] = tables
@@ -271,60 +265,61 @@ def _refresh_quality_cache(table_filter: Optional[str] = None) -> List[QualityRe
     """从 DuckDB 刷新质量报告缓存"""
     reports = []
     db_path = _get_duckdb_path()
-    conn = None
     try:
         import duckdb
-        conn = duckdb.connect(db_path, read_only=True)
-
-        table_rows = conn.execute(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
-        ).fetchall()
-
-        for (table_name,) in table_rows:
-            if table_filter and table_name != table_filter:
-                continue
+        with db_lock(db_path, mode="shared", timeout=60.0):
+            conn = duckdb.connect(db_path, read_only=True)
             try:
-                count_result = conn.execute(
-                    f"SELECT COUNT(*) FROM {table_name}"
-                ).fetchone()
-                record_count = count_result[0] if count_result else 0
-                if record_count == 0:
-                    continue
-
-                cols = conn.execute(
-                    f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'"
+                table_rows = conn.execute(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
                 ).fetchall()
-                total_cells = record_count * len(cols)
-                null_cells = 0
-                for (col_name,) in cols:
+
+                for (table_name,) in table_rows:
+                    if table_filter and table_name != table_filter:
+                        continue
                     try:
-                        null_result = conn.execute(
-                            f"SELECT COUNT(*) FROM {table_name} WHERE {col_name} IS NULL"
+                        count_result = conn.execute(
+                            f"SELECT COUNT(*) FROM {table_name}"
                         ).fetchone()
-                        null_cells += null_result[0]
-                    except Exception:
-                        pass
+                        record_count = count_result[0] if count_result else 0
+                        if record_count == 0:
+                            continue
 
-                missing_rate = null_cells / total_cells if total_cells > 0 else 0.0
-                coverage_score = max(0.0, 100.0 - missing_rate * 100)
-                overall_score = coverage_score
+                        cols = conn.execute(
+                            f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'"
+                        ).fetchall()
+                        total_cells = record_count * len(cols)
+                        null_cells = 0
+                        for (col_name,) in cols:
+                            try:
+                                null_result = conn.execute(
+                                    f"SELECT COUNT(*) FROM {table_name} WHERE {col_name} IS NULL"
+                                ).fetchone()
+                                null_cells += null_result[0]
+                            except Exception:
+                                pass
 
-                reports.append(
-                    QualityReport(
-                        table=table_name,
-                        missing_rate=round(missing_rate, 4),
-                        coverage_score=round(coverage_score, 1),
-                        overall_score=round(overall_score, 1),
-                    )
-                )
-            except Exception as e:
-                logger.warning(f"计算 {table_name} 质量失败: {e}")
+                        missing_rate = null_cells / total_cells if total_cells > 0 else 0.0
+                        coverage_score = max(0.0, 100.0 - missing_rate * 100)
+                        overall_score = coverage_score
 
+                        reports.append(
+                            QualityReport(
+                                table=table_name,
+                                missing_rate=round(missing_rate, 4),
+                                coverage_score=round(coverage_score, 1),
+                                overall_score=round(overall_score, 1),
+                            )
+                        )
+                    except Exception as e:
+                        logger.warning(f"计算 {table_name} 质量失败: {e}")
+            finally:
+                conn.close()
+
+    except TimeoutError as e:
+        logger.warning(f"刷新质量缓存时获取读锁超时: {e}")
     except Exception as e:
         logger.error(f"刷新质量缓存失败: {e}")
-    finally:
-        if conn:
-            conn.close()
 
     if reports:
         _data_cache["quality"] = reports
@@ -476,67 +471,72 @@ async def preview_table(
 ):
     """预览表数据（前 N 行）"""
     db_path = _get_duckdb_path()
-    conn = None
     try:
         import duckdb
-        conn = duckdb.connect(db_path, read_only=True)
+        with db_lock(db_path, mode="shared", timeout=60.0):
+            conn = duckdb.connect(db_path, read_only=True)
+            try:
+                # 验证表存在
+                tables = conn.execute(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
+                ).fetchall()
+                if table_name not in [t[0] for t in tables]:
+                    return TablePreviewResponse(
+                        table=table_name, columns=[], rows=[], total=0, limit=limit
+                    )
 
-        # 验证表存在
-        tables = conn.execute(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
-        ).fetchall()
-        if table_name not in [t[0] for t in tables]:
-            return TablePreviewResponse(
-                table=table_name, columns=[], rows=[], total=0, limit=limit
-            )
+                # 获取列信息
+                cols = conn.execute(
+                    "SELECT column_name, data_type FROM information_schema.columns "
+                    f"WHERE table_name = '{table_name}' ORDER BY ordinal_position"
+                ).fetchall()
+                columns = [ColumnInfo(name=c[0], type=c[1] or "UNKNOWN") for c in cols]
 
-        # 获取列信息
-        cols = conn.execute(
-            "SELECT column_name, data_type FROM information_schema.columns "
-            f"WHERE table_name = '{table_name}' ORDER BY ordinal_position"
-        ).fetchall()
-        columns = [ColumnInfo(name=c[0], type=c[1] or "UNKNOWN") for c in cols]
+                # 获取总行数
+                count_result = conn.execute(
+                    f"SELECT COUNT(*) FROM {table_name}"
+                ).fetchone()
+                total = count_result[0] if count_result else 0
 
-        # 获取总行数
-        count_result = conn.execute(
-            f"SELECT COUNT(*) FROM {table_name}"
-        ).fetchone()
-        total = count_result[0] if count_result else 0
+                # 获取前 N 行
+                rows = conn.execute(
+                    f"SELECT * FROM {table_name} LIMIT {limit}"
+                ).fetchall()
 
-        # 获取前 N 行
-        rows = conn.execute(
-            f"SELECT * FROM {table_name} LIMIT {limit}"
-        ).fetchall()
+                # 将 Decimal/datetime 等转为可 JSON 序列化的类型
+                serializable_rows = []
+                for row in rows:
+                    new_row = []
+                    for val in row:
+                        if val is None:
+                            new_row.append(None)
+                        elif hasattr(val, "isoformat"):
+                            new_row.append(val.isoformat())
+                        elif hasattr(val, "__float__"):
+                            new_row.append(float(val))
+                        elif hasattr(val, "__int__") and not isinstance(val, bool):
+                            new_row.append(int(val))
+                        else:
+                            new_row.append(val)
+                    serializable_rows.append(new_row)
 
-        # 将 Decimal/datetime 等转为可 JSON 序列化的类型
-        serializable_rows = []
-        for row in rows:
-            new_row = []
-            for val in row:
-                if val is None:
-                    new_row.append(None)
-                elif hasattr(val, "isoformat"):
-                    new_row.append(val.isoformat())
-                elif hasattr(val, "__float__"):
-                    new_row.append(float(val))
-                elif hasattr(val, "__int__") and not isinstance(val, bool):
-                    new_row.append(int(val))
-                else:
-                    new_row.append(val)
-            serializable_rows.append(new_row)
+                return TablePreviewResponse(
+                    table=table_name,
+                    columns=columns,
+                    rows=serializable_rows,
+                    total=total,
+                    limit=limit,
+                )
+            finally:
+                conn.close()
 
+    except TimeoutError as e:
+        logger.warning(f"预览表 {table_name} 时获取读锁超时: {e}")
         return TablePreviewResponse(
-            table=table_name,
-            columns=columns,
-            rows=serializable_rows,
-            total=total,
-            limit=limit,
+            table=table_name, columns=[], rows=[], total=0, limit=limit
         )
     except Exception as e:
         logger.error(f"预览表 {table_name} 失败: {e}")
         return TablePreviewResponse(
             table=table_name, columns=[], rows=[], total=0, limit=limit
         )
-    finally:
-        if conn:
-            conn.close()

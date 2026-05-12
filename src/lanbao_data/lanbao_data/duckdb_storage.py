@@ -13,6 +13,8 @@ from typing import Optional, List, Dict, Any
 from pathlib import Path
 from loguru import logger
 
+from .duckdb_lock import db_lock
+
 
 class DuckDBStorage:
     """
@@ -27,7 +29,7 @@ class DuckDBStorage:
     def __init__(self, db_path: str = "./data/lanbao.duckdb", read_only: bool = False, timeout: int = 30):
         """
         初始化DuckDB存储
-        
+
         Args:
             db_path: 数据库文件路径
             read_only: 是否以只读模式打开
@@ -35,32 +37,60 @@ class DuckDBStorage:
         """
         self._db_path = db_path
         self._read_only = read_only
-        
+        self._lock_fd = None
+
         # 确保目录存在
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-        
-        # 清理可能存在的旧锁文件
-        self._cleanup_lock_files()
-        
+
+        # 获取文件锁（共享或排他），确保多进程协调访问
+        self._acquire_file_lock(timeout)
+
         # 初始化连接（带重试）
         self._conn = self._connect_with_retry(timeout)
-        
+
         # 初始化表结构
         if not read_only:
             self._init_tables()
-        
+
         logger.info(f"DuckDB存储初始化完成: {db_path} (read_only={read_only})")
     
-    def _cleanup_lock_files(self):
-        """清理可能存在的锁文件"""
-        lock_file = f"{self._db_path}.wal"
-        # 检查是否有其他进程在使用
-        try:
-            # 尝试获取文件锁信息，如果不能获取则等待
-            pass
-        except Exception as e:
-            logger.warning(f"清理锁文件时出错: {e}")
-    
+    def _acquire_file_lock(self, timeout: int):
+        """获取操作系统文件锁（共享或排他）"""
+        import fcntl
+
+        lock_file = f"{self._db_path}.lock"
+        lock_cmd = fcntl.LOCK_SH if self._read_only else fcntl.LOCK_EX
+        self._lock_fd = os.open(lock_file, os.O_CREAT | os.O_RDWR)
+
+        start = time.time()
+        while time.time() - start < timeout:
+            try:
+                fcntl.flock(self._lock_fd, lock_cmd | fcntl.LOCK_NB)
+                logger.debug(f"获取 {'共享' if self._read_only else '排他'} 文件锁成功")
+                return
+            except (IOError, OSError):
+                time.sleep(0.5)
+
+        raise TimeoutError(
+            f"无法获取 DuckDB {'共享' if self._read_only else '排他'} 锁，超时 {timeout}s"
+        )
+
+    def _release_file_lock(self):
+        """释放操作系统文件锁"""
+        import fcntl
+
+        if self._lock_fd is not None:
+            try:
+                fcntl.flock(self._lock_fd, fcntl.LOCK_UN)
+                logger.debug("释放文件锁")
+            except Exception:
+                pass
+            try:
+                os.close(self._lock_fd)
+            except Exception:
+                pass
+            self._lock_fd = None
+
     def _connect_with_retry(self, timeout: int) -> duckdb.DuckDBPyConnection:
         """
         带重试的连接
@@ -513,10 +543,12 @@ class DuckDBStorage:
             return pd.DataFrame()
     
     def close(self):
-        """关闭数据库连接"""
+        """关闭数据库连接并释放文件锁"""
         if self._conn:
             self._conn.close()
+            self._conn = None
             logger.info("DuckDB连接已关闭")
+        self._release_file_lock()
     
     def get_symbol_max_date(self, symbol: str) -> Optional[datetime.date]:
         """

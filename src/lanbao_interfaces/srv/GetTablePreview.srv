@@ -1,0 +1,5 @@
+string table_name
+int32 limit
+---
+bool success
+string json_data   # JSON 序列化的预览数据

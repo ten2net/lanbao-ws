@@ -25,6 +25,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/DataQualityItem.msg"
   "msg/SyncStatusDetail.msg"
   "msg/SystemMetrics.msg"
+  "msg/DataTable.msg"
 
   # 服务定义
   "srv/GetMarketData.srv"
@@ -36,6 +37,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/GetDataStats.srv"
   "srv/GetDataQuality.srv"
   "srv/GetSyncStatus.srv"
+  "srv/GetDataTables.srv"
+  "srv/GetTablePreview.srv"
 
   # 动作定义
   "action/BacktestStrategy.action"

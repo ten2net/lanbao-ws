@@ -43,16 +43,6 @@ export function BacktestTable() {
 
   const columns = [
     {
-      title: '回测ID',
-      dataIndex: 'backtest_id',
-      key: 'backtest_id',
-      render: (id: string) => (
-        <Button type="link" onClick={() => navigate(`/backtest/${id}`)} style={{ padding: 0 }}>
-          {id}
-        </Button>
-      ),
-    },
-    {
       title: '策略',
       dataIndex: 'strategy_name',
       key: 'strategy_name',
@@ -206,7 +196,7 @@ export function BacktestTable() {
         loading={isLoading}
         pagination={false}
         size="small"
-        scroll={{ x: 1400 }}
+        scroll={{ x: 1200 }}
       />
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>

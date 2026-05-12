@@ -17,8 +17,8 @@ import json
 from contextlib import contextmanager
 
 from lanbao_core import DataProcessorNode, NodeConfig
-from lanbao_interfaces.msg import MarketData, SystemAlert, DataStats, DataQualityItem, SyncStatusDetail
-from lanbao_interfaces.srv import GetMarketData, GetDataStats, GetDataQuality, GetSyncStatus
+from lanbao_interfaces.msg import MarketData, SystemAlert, DataStats, DataQualityItem, SyncStatusDetail, DataTable
+from lanbao_interfaces.srv import GetMarketData, GetDataStats, GetDataQuality, GetSyncStatus, GetDataTables, GetTablePreview
 
 from .tushare_adapter import TushareAdapter
 from .tdx_adapter import TDXAdapter
@@ -179,6 +179,18 @@ class MarketDataNode(DataProcessorNode):
             self._handle_get_sync_status,
             callback_group=self._callback_group
         )
+        self._get_data_tables_service = self.create_service(
+            GetDataTables,
+            'data/tables',
+            self._handle_get_data_tables,
+            callback_group=self._callback_group
+        )
+        self._get_table_preview_service = self.create_service(
+            GetTablePreview,
+            'data/preview',
+            self._handle_get_table_preview,
+            callback_group=self._callback_group
+        )
 
         logger.info("市场数据服务已设置")
 
@@ -200,6 +212,22 @@ class MarketDataNode(DataProcessorNode):
                     "FROM stock_daily GROUP BY prefix ORDER BY cnt DESC"
                 ).fetchall()
 
+                # 计算覆盖天数
+                coverage_days = 0
+                if date_range[0] and date_range[1]:
+                    try:
+                        d1 = datetime.strptime(str(date_range[0]), "%Y-%m-%d")
+                        d2 = datetime.strptime(str(date_range[1]), "%Y-%m-%d")
+                        coverage_days = (d2 - d1).days + 1
+                    except Exception:
+                        pass
+
+                # 获取最后同步时间
+                sync_result = conn.execute(
+                    "SELECT last_sync_time FROM sync_status WHERE id = 1"
+                ).fetchone()
+                last_sync = str(sync_result[0]) if sync_result and sync_result[0] else ""
+
             exchange_names = []
             exchange_counts = []
             prefix_map = {'60': '上海主板', '68': '科创板', '00': '深圳主板', '30': '创业板', '92': '北交所'}
@@ -215,6 +243,9 @@ class MarketDataNode(DataProcessorNode):
             stats.db_size_mb = round(db_size_mb, 2)
             stats.exchange_names = exchange_names
             stats.exchange_counts = exchange_counts
+            stats.coverage_days = coverage_days
+            stats.last_sync_time = last_sync
+            stats.total_daily_records = int(total_records)
 
             response.stats = stats
             response.success = True
@@ -222,6 +253,143 @@ class MarketDataNode(DataProcessorNode):
         except Exception as e:
             logger.error(f"获取数据概况失败: {e}")
             response.success = False
+        return response
+
+    def _handle_get_data_tables(self, request, response):
+        """处理获取数据表列表请求"""
+        try:
+            tables = []
+            with self._db(read_only=True) as storage:
+                conn = storage._conn
+                table_rows = conn.execute(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
+                ).fetchall()
+
+                for (table_name,) in table_rows:
+                    try:
+                        count_result = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
+                        record_count = count_result[0] if count_result else 0
+
+                        date_start = None
+                        date_end = None
+                        try:
+                            cols = conn.execute(
+                                f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'"
+                            ).fetchall()
+                            col_names = [c[0] for c in cols]
+                            if "date" in col_names:
+                                range_result = conn.execute(
+                                    f"SELECT MIN(date), MAX(date) FROM {table_name}"
+                                ).fetchone()
+                                date_start = str(range_result[0]) if range_result and range_result[0] else ""
+                                date_end = str(range_result[1]) if range_result and range_result[1] else ""
+                        except Exception:
+                            pass
+
+                        quality_score = 100.0
+                        if record_count > 0:
+                            try:
+                                cols = conn.execute(
+                                    f"SELECT column_name FROM information_schema.columns WHERE table_name = '{table_name}'"
+                                ).fetchall()
+                                null_counts = []
+                                for (col_name,) in cols:
+                                    if col_name in ("created_at", "updated_at", "data_source"):
+                                        continue
+                                    try:
+                                        null_result = conn.execute(
+                                            f"SELECT COUNT(*) FROM {table_name} WHERE {col_name} IS NULL"
+                                        ).fetchone()
+                                        null_counts.append(null_result[0])
+                                    except Exception:
+                                        pass
+                                total_nulls = sum(null_counts)
+                                if total_nulls > 0:
+                                    quality_score = max(0.0, 100.0 - (total_nulls / record_count) * 100)
+                            except Exception:
+                                pass
+
+                        table = DataTable()
+                        table.name = table_name
+                        table.record_count = int(record_count)
+                        table.date_start = date_start or ""
+                        table.date_end = date_end or ""
+                        table.quality_score = round(quality_score, 1)
+                        tables.append(table)
+                    except Exception as e:
+                        logger.warning(f"处理表 {table_name} 失败: {e}")
+
+            response.tables = tables
+            response.success = True
+
+        except Exception as e:
+            logger.error(f"获取数据表列表失败: {e}")
+            response.success = False
+        return response
+
+    def _handle_get_table_preview(self, request, response):
+        """处理获取表预览数据请求"""
+        try:
+            table_name = request.table_name
+            limit = request.limit if request.limit > 0 else 100
+
+            with self._db(read_only=True) as storage:
+                conn = storage._conn
+
+                # 验证表存在
+                tables = conn.execute(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
+                ).fetchall()
+                if table_name not in [t[0] for t in tables]:
+                    response.success = True
+                    response.json_data = json.dumps({"table": table_name, "columns": [], "rows": [], "total": 0, "limit": limit})
+                    return response
+
+                # 获取列信息
+                cols = conn.execute(
+                    "SELECT column_name, data_type FROM information_schema.columns "
+                    f"WHERE table_name = '{table_name}' ORDER BY ordinal_position"
+                ).fetchall()
+                columns = [{"name": c[0], "type": c[1] or "UNKNOWN"} for c in cols]
+
+                # 获取总行数
+                count_result = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
+                total = count_result[0] if count_result else 0
+
+                # 获取前 N 行
+                rows = conn.execute(f"SELECT * FROM {table_name} LIMIT {limit}").fetchall()
+
+                # 序列化
+                serializable_rows = []
+                for row in rows:
+                    new_row = []
+                    for val in row:
+                        if val is None:
+                            new_row.append(None)
+                        elif hasattr(val, "isoformat"):
+                            new_row.append(val.isoformat())
+                        elif hasattr(val, "__float__"):
+                            new_row.append(float(val))
+                        elif hasattr(val, "__int__") and not isinstance(val, bool):
+                            new_row.append(int(val))
+                        else:
+                            new_row.append(val)
+                    serializable_rows.append(new_row)
+
+                result = {
+                    "table": table_name,
+                    "columns": columns,
+                    "rows": serializable_rows,
+                    "total": total,
+                    "limit": limit,
+                }
+                response.json_data = json.dumps(result)
+                response.success = True
+
+        except Exception as e:
+            logger.error(f"预览表 {request.table_name} 失败: {e}")
+            response.success = False
+            response.json_data = json.dumps({"error": str(e)})
         return response
 
     def _handle_get_data_quality(self, request, response):

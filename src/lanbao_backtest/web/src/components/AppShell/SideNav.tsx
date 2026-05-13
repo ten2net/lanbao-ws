@@ -8,6 +8,9 @@ import {
   AlertOutlined,
   DatabaseOutlined,
   ToolOutlined,
+  FileTextOutlined,
+  SearchOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { MenuProps } from 'antd';
@@ -21,6 +24,9 @@ const menuConfig: Record<string, MenuProps['items']> = {
     { key: '/', label: '回测列表', icon: <BarChartOutlined /> },
     { key: '/compare', label: '批量对比', icon: <LineChartOutlined /> },
     { key: '/param-analysis', label: '参数分析', icon: <SettingOutlined /> },
+    { key: '/ai-research/daily', label: 'AI日报', icon: <FileTextOutlined /> },
+    { key: '/ai-research/stock', label: '个股研究', icon: <SearchOutlined /> },
+    { key: '/ai-research/history', label: '报告历史', icon: <HistoryOutlined /> },
   ],
   monitor: [
     { key: '/system-overview', label: '系统概览', icon: <DashboardOutlined /> },

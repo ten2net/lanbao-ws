@@ -40,6 +40,9 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/GetSyncStatus.srv"
   "srv/GetDataTables.srv"
   "srv/GetTablePreview.srv"
+  "srv/GetResearchReport.srv"
+  "srv/GetFinancialData.srv"
+  "srv/SaveResearchReport.srv"
 
   # 动作定义
   "action/BacktestStrategy.action"

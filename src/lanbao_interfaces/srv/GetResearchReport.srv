@@ -1,0 +1,7 @@
+# Request
+string report_id
+---
+# Response
+bool found
+string report_json
+string created_at

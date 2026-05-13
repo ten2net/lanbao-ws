@@ -1,0 +1,8 @@
+# Request
+string symbol
+string report_type          # "balance_sheet" | "income" | "cashflow" | "indicator"
+---
+# Response
+bool success
+string message
+string data_json            # JSON格式财务数据

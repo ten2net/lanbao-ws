@@ -1,0 +1,13 @@
+# Request
+string report_id
+string report_type
+string[] symbols
+string summary
+string verdict
+float32 confidence
+string report_json
+string created_at
+---
+# Response
+bool success
+string message

@@ -1,9 +1,10 @@
 """LLM Provider 工厂"""
 from .base import BaseLLMProvider, LLMConfig
+from .deepseek import DeepSeekProvider
 
 
 PROVIDER_REGISTRY = {
-    "deepseek": None,  # Will be set by deepseek.py import
+    "deepseek": DeepSeekProvider,
     "qwen": None,
     "openrouter": None,
 }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Table, Button, Space, Typography } from 'antd';
+import { Card, Table, Button, Typography } from 'antd';
 import { HistoryOutlined, EyeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useResearchReports } from '../hooks/useResearch';

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Button, Table, Tag, Typography, message, Space } from 'antd';
+import { Card, Button, Table, Typography, message, Space } from 'antd';
 import { FileTextOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useResearchReports, useTriggerMarketDaily } from '../hooks/useResearch';
@@ -15,7 +15,7 @@ export const AIResearchDailyPage: React.FC = () => {
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      const result = await triggerDaily.mutateAsync();
+      const result = await triggerDaily.mutateAsync(undefined);
       message.success(`已开始生成日报: ${result.report_id}`);
       navigate(`/ai-research/stock?reportId=${result.report_id}`);
     } catch (e) {

@@ -13,6 +13,7 @@ export interface ResearchStatus {
   status: string;
   progress: number;
   message: string;
+  current_agent?: string;
 }
 
 export interface ResearchReport {

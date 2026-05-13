@@ -1,0 +1,49 @@
+# 智能投研配置
+ai_research:
+  llm:
+    default_provider: "deepseek"
+    default_model: "deepseek-chat"
+    agents:
+      macro_analyst:
+        provider: "deepseek"
+        model: "deepseek-chat"
+        temperature: 0.3
+        max_tokens: 4096
+      fundamental_analyst:
+        provider: "deepseek"
+        model: "deepseek-chat"
+        temperature: 0.2
+        max_tokens: 4096
+      technical_analyst:
+        provider: "deepseek"
+        model: "deepseek-chat"
+        temperature: 0.3
+        max_tokens: 4096
+      sentiment_news_analyst:
+        provider: "deepseek"
+        model: "deepseek-chat"
+        temperature: 0.4
+        max_tokens: 4096
+      portfolio_director:
+        provider: "deepseek"
+        model: "deepseek-reasoner"
+        temperature: 0.2
+        max_tokens: 8192
+    fallback:
+      enabled: true
+      order: ["deepseek", "qwen"]
+  news:
+    enabled: true
+    sources:
+      - name: "eastmoney"
+        enabled: true
+  report:
+    max_symbols_per_daily: 20
+    default_symbols: ["000001.SH", "000300.SH"]
+    output_format: ["json", "markdown"]
+    storage_path: "./reports"
+  schedule:
+    daily_report:
+      enabled: true
+      trigger: "after_data_sync"
+      fallback_time: "18:00"

@@ -20,6 +20,7 @@ colcon build --packages-select \
     lanbao_backtest \
     lanbao_risk \
     lanbao_monitor \
+    lanbao_ai_research \
     --symlink-install
 
 if [ $? -eq 0 ]; then

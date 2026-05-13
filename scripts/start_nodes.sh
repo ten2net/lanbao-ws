@@ -156,6 +156,10 @@ sleep 1
 
 # 7. 系统指标节点
 start_node "system_metrics" "lanbao_monitor" "lanbao_monitor.system_metrics_node"
+sleep 1
+
+# 8. AI 投研节点
+start_node "ai_research" "lanbao_ai_research" "lanbao_ai_research.ai_research_node"
 
 echo ""
 echo -e "${GREEN}=======================================${NC}"

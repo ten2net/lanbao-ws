@@ -26,6 +26,8 @@ from lanbao_core.base_node import LanBaoBaseNode
 from lanbao_core.config import NodeConfig
 from std_msgs.msg import String as StdString
 
+from lanbao_interfaces.srv import SaveResearchReport, GetResearchReport
+
 from .tushare_adapter import TushareAdapter
 from .duckdb_storage import DuckDBStorage
 
@@ -74,6 +76,18 @@ class DataSyncNode(LanBaoBaseNode):
             # 注册健康检查
             self._health.register_check('tushare_connection', self._check_tushare, interval_seconds=60)
             self._health.register_check('storage_connection', self._check_storage_available, interval_seconds=60)
+
+            # 创建研究报告相关服务
+            self._save_research_report_service = self.create_service(
+                SaveResearchReport,
+                '/data_sync/save_research_report',
+                self._handle_save_research_report
+            )
+            self._get_research_report_service = self.create_service(
+                GetResearchReport,
+                '/data_sync/get_research_report',
+                self._handle_get_research_report
+            )
 
             logger.info("DataSyncNode 资源初始化完成（无持久数据库连接）")
             return True
@@ -564,6 +578,67 @@ class DataSyncNode(LanBaoBaseNode):
             return {'status': 'DEGRADED', 'message': 'DuckDB数据库文件不存在，首次同步将创建'}
         except Exception as e:
             return {'status': 'UNHEALTHY', 'message': f'检查存储失败: {e}'}
+
+    def _handle_save_research_report(self, request, response):
+        """处理保存研究报告请求"""
+        storage = None
+        try:
+            db_path = os.getenv('DUCKDB_PATH', './data/lanbao.duckdb')
+            storage = DuckDBStorage(db_path, read_only=False)
+
+            success = storage.save_research_report(
+                report_id=request.report_id,
+                report_type=request.report_type,
+                symbols=list(request.symbols),
+                summary=request.summary,
+                verdict=request.verdict,
+                confidence=request.confidence,
+                report_json=request.report_json
+            )
+
+            response.success = success
+            response.message = "保存成功" if success else "保存失败"
+        except Exception as e:
+            logger.error(f"保存研究报告服务出错: {e}")
+            response.success = False
+            response.message = f"保存失败: {str(e)}"
+        finally:
+            if storage:
+                storage.close()
+
+        return response
+
+    def _handle_get_research_report(self, request, response):
+        """处理获取研究报告请求"""
+        storage = None
+        try:
+            db_path = os.getenv('DUCKDB_PATH', './data/lanbao.duckdb')
+            storage = DuckDBStorage(db_path, read_only=True)
+
+            report = storage.get_research_report(request.report_id)
+
+            if report:
+                response.found = True
+                response.report_json = report.get('report_json', '')
+                created_at = report.get('created_at')
+                if created_at and hasattr(created_at, 'strftime'):
+                    response.created_at = created_at.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    response.created_at = str(created_at) if created_at else ''
+            else:
+                response.found = False
+                response.report_json = ''
+                response.created_at = ''
+        except Exception as e:
+            logger.error(f"获取研究报告服务出错: {e}")
+            response.found = False
+            response.report_json = ''
+            response.created_at = ''
+        finally:
+            if storage:
+                storage.close()
+
+        return response
 
 
 def main(args=None):

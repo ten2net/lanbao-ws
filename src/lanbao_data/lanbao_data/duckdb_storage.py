@@ -229,6 +229,23 @@ class DuckDBStorage:
             )
         """)
 
+        # 研究报告表
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS research_reports (
+                report_id VARCHAR PRIMARY KEY,
+                report_type VARCHAR NOT NULL,
+                symbols VARCHAR[],
+                summary VARCHAR,
+                verdict VARCHAR,
+                confidence FLOAT,
+                report_json VARCHAR,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_research_reports_type ON research_reports(report_type)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_research_reports_created ON research_reports(created_at DESC)")
+
         # 迁移：为旧表添加复权相关列
         self._migrate_stock_daily()
 
@@ -731,6 +748,103 @@ class DuckDBStorage:
         except Exception as e:
             logger.error(f"获取同步状态失败: {e}")
             return None
+
+    def save_research_report(self, report_id: str, report_type: str,
+                             symbols: Optional[List[str]], summary: str,
+                             verdict: str, confidence: float,
+                             report_json: str) -> bool:
+        """
+        保存研究报告
+
+        Args:
+            report_id: 报告唯一标识
+            report_type: 报告类型
+            symbols: 相关股票代码列表
+            summary: 摘要
+            verdict: 结论
+            confidence: 置信度
+            report_json: 报告完整JSON
+
+        Returns:
+            是否成功
+        """
+        try:
+            self._conn.execute("""
+                INSERT INTO research_reports (report_id, report_type, symbols, summary, verdict, confidence, report_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (report_id) DO UPDATE SET
+                    report_type = EXCLUDED.report_type,
+                    symbols = EXCLUDED.symbols,
+                    summary = EXCLUDED.summary,
+                    verdict = EXCLUDED.verdict,
+                    confidence = EXCLUDED.confidence,
+                    report_json = EXCLUDED.report_json,
+                    created_at = EXCLUDED.created_at
+            """, [report_id, report_type, symbols, summary, verdict, confidence, report_json])
+            logger.info(f"保存研究报告: {report_id}")
+            return True
+        except Exception as e:
+            logger.error(f"保存研究报告失败: {e}")
+            return False
+
+    def get_research_report(self, report_id: str) -> Optional[Dict[str, Any]]:
+        """
+        获取单篇研究报告
+
+        Args:
+            report_id: 报告唯一标识
+
+        Returns:
+            报告字典，不存在返回 None
+        """
+        try:
+            result = self._conn.execute(
+                "SELECT * FROM research_reports WHERE report_id = ?",
+                [report_id]
+            ).fetchone()
+            if result:
+                columns = ['report_id', 'report_type', 'symbols', 'summary',
+                           'verdict', 'confidence', 'report_json', 'created_at']
+                return dict(zip(columns, result))
+            return None
+        except Exception as e:
+            logger.error(f"获取研究报告失败: {e}")
+            return None
+
+    def get_research_reports(self, report_type: Optional[str] = None,
+                             limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+        """
+        获取研究报告列表
+
+        Args:
+            report_type: 按类型筛选，None则获取全部
+            limit: 返回数量上限
+            offset: 偏移量
+
+        Returns:
+            报告字典列表
+        """
+        try:
+            if report_type:
+                results = self._conn.execute("""
+                    SELECT * FROM research_reports
+                    WHERE report_type = ?
+                    ORDER BY created_at DESC
+                    LIMIT ? OFFSET ?
+                """, [report_type, limit, offset]).fetchall()
+            else:
+                results = self._conn.execute("""
+                    SELECT * FROM research_reports
+                    ORDER BY created_at DESC
+                    LIMIT ? OFFSET ?
+                """, [limit, offset]).fetchall()
+
+            columns = ['report_id', 'report_type', 'symbols', 'summary',
+                       'verdict', 'confidence', 'report_json', 'created_at']
+            return [dict(zip(columns, row)) for row in results]
+        except Exception as e:
+            logger.error(f"获取研究报告列表失败: {e}")
+            return []
 
     def __enter__(self):
         return self

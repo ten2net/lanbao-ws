@@ -20,7 +20,7 @@ class MacroAnalyst(BaseAgent):
         try:
             market_data = context.market_data or {}
             data_text = json.dumps(market_data, ensure_ascii=False, indent=2)
-            prompt = self.prompt_template.format(data=data_text)
+            prompt = self._format_prompt(data=data_text)
 
             response = await self._call_llm(
                 prompt,

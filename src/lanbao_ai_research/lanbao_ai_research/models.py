@@ -128,7 +128,7 @@ class ResearchReport(BaseModel):
 class AnalysisContext(BaseModel):
     """分析上下文"""
     symbol: Optional[str] = None
-    market_data: Optional[Dict[str, Any]] = None
+    market_data: Optional[Any] = None  # 支持 Dict 或 DataFrame
     financial_data: Optional[Dict[str, Any]] = None
     news_items: List[str] = Field(default_factory=list)
     macro_context: Optional[str] = None

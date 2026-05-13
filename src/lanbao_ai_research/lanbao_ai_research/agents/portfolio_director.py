@@ -7,7 +7,7 @@ from loguru import logger
 
 from .base_agent import BaseAgent
 from ..models import (
-    AgentReport, ResearchReport, ReportSummary,
+    AgentReport, AnalysisContext, ResearchReport, ReportSummary,
     StockAnalysis, StockSynthesis, PortfolioSuggestions
 )
 
@@ -17,6 +17,15 @@ class PortfolioDirector(BaseAgent):
 
     def __init__(self, llm_client):
         super().__init__("portfolio_director", llm_client, "portfolio_director.txt")
+
+    async def analyze(self, context: AnalysisContext) -> AgentReport:
+        """投资总监的分析方法（抽象方法实现）"""
+        # PortfolioDirector 主要通过 synthesize 工作，analyze 作为占位实现
+        return AgentReport(
+            agent_name=self.name,
+            success=True,
+            data={"message": "PortfolioDirector 使用 synthesize 方法进行综合决策"}
+        )
 
     async def synthesize(self, macro_report: AgentReport,
                         stock_reports: Dict[str, Dict[str, AgentReport]]) -> ResearchReport:
@@ -36,7 +45,7 @@ class PortfolioDirector(BaseAgent):
                 }
                 stock_texts.append(json.dumps(stock_info, ensure_ascii=False, indent=2))
 
-            prompt = self.prompt_template.format(
+            prompt = self._format_prompt(
                 macro_report=macro_text,
                 stock_reports="\n\n".join(stock_texts)
             )

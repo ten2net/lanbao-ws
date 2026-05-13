@@ -75,7 +75,7 @@ class TechnicalAnalyst(BaseAgent):
                 recent = market_data.tail(20)
                 recent_data = recent.reset_index().to_dict('records')
 
-            prompt = self.prompt_template.format(
+            prompt = self._format_prompt(
                 symbol=symbol,
                 technical_data=json.dumps({
                     "indicators": indicators,

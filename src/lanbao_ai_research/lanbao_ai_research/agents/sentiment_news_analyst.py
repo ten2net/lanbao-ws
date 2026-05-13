@@ -57,7 +57,7 @@ class SentimentNewsAnalyst(BaseAgent):
                 sentiment = price_change * 10 + (volume_ratio - 1) * 0.5
                 sentiment = max(-1.0, min(1.0, sentiment))
 
-            prompt = self.prompt_template.format(
+            prompt = self._format_prompt(
                 symbol=symbol,
                 market_data=json.dumps({
                     "sentiment_score": round(sentiment, 2),

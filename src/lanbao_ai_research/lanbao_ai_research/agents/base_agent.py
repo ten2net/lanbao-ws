@@ -39,6 +39,13 @@ class BaseAgent(ABC):
         """
         pass
 
+    def _format_prompt(self, **kwargs) -> str:
+        """格式化 Prompt 模板（使用 replace 而非 format，避免 JSON 代码块被误解析）"""
+        result = self.prompt_template
+        for key, value in kwargs.items():
+            result = result.replace(f"{{{key}}}", str(value))
+        return result
+
     async def _call_llm(self, prompt: str, system: Optional[str] = None,
                         temperature: Optional[float] = None) -> str:
         """调用 LLM，自动处理重试"""

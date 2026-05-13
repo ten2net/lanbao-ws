@@ -21,7 +21,7 @@ class FundamentalAnalyst(BaseAgent):
             symbol = context.symbol or "UNKNOWN"
             financial = context.financial_data or {}
 
-            prompt = self.prompt_template.format(
+            prompt = self._format_prompt(
                 symbol=symbol,
                 name=financial.get("name", symbol),
                 financial_data=json.dumps(financial, ensure_ascii=False, indent=2)

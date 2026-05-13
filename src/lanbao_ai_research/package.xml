@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>lanbao_ai_research</name>
+  <version>0.5.0</version>
+  <description>揽宝智能投研分析模块</description>
+  <maintainer email="dev@lanbao.com">揽宝开发团队</maintainer>
+  <license>MIT</license>
+
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+  <depend>lanbao_interfaces</depend>
+  <depend>lanbao_core</depend>
+
+  <test_depend>pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

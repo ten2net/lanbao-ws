@@ -1,0 +1,16 @@
+# Goal
+string research_type        # "market_daily" | "stock_analysis"
+string[] symbols            # 标的列表
+string report_id            # 客户端指定报告ID
+---
+# Result
+bool success
+string report_id
+string report_path
+string error_message
+---
+# Feedback
+string current_agent        # 当前正在执行的分析智能体
+string status               # "running" | "completed" | "failed"
+float32 progress            # 0.0 ~ 1.0
+string message              # 状态描述

@@ -45,6 +45,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/BacktestStrategy.action"
   "action/DeployStrategy.action"
   "action/CircuitBreaker.action"
+  "action/RunResearch.action"
   
   DEPENDENCIES std_msgs builtin_interfaces
 )

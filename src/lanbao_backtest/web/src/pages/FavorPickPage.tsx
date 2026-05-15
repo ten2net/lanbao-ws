@@ -86,9 +86,15 @@ export const FavorPickPage: React.FC = () => {
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
               <Space size="large">
                 <Text>总计: <strong>{result.total_unique}</strong></Text>
-                <Text>新增: <strong>{result.added}</strong></Text>
-                <Text>已存在: <strong>{result.existing}</strong></Text>
+                <Text>新增: <strong style={{ color: '#3f8600' }}>{result.added}</strong></Text>
+                <Text>已存在: <strong style={{ color: '#faad14' }}>{result.existing}</strong></Text>
               </Space>
+              <div style={{ background: '#f6ffed', border: '1px solid #b7eb8f', padding: 12, borderRadius: 4 }}>
+                <Text type="secondary">
+                  新增股票已保存到<strong>系统自选股 → 揽宝</strong>分组。
+                  {result.existing > 0 && ' 已存在表示这些股票已在系统自选股中，本次未重复添加。'}
+                </Text>
+              </div>
               <div>
                 {result.codes.map((code) => (
                   <Tag key={code} style={{ marginBottom: 4 }}>{code}</Tag>

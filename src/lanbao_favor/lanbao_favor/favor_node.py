@@ -130,21 +130,47 @@ class FavorNode(LanBaoBaseNode):
                         all_codes.add(s.code)
                         all_stocks.append(s)
 
-            added = 0
-            existing = 0
+            # 1. 先保存到系统自选股（DuckDB）
+            sys_existing = set()
+            sys_added = 0
+            try:
+                sys_items = self._storage.list_watchlist(group_name='揽宝')
+                sys_existing = {item['code'] for item in sys_items}
+
+                for stock in all_stocks:
+                    if stock.code not in sys_existing:
+                        self._storage.add_to_watchlist({
+                            'code': stock.code,
+                            'name': getattr(stock, 'name', ''),
+                            'account_id': account_id,
+                            'group_name': '揽宝',
+                            'source_condition': stock.source_condition or '智能选股',
+                            'signal_type': 'PICK',
+                            'confidence': 0.0,
+                        })
+                        sys_added += 1
+            except Exception as e:
+                logger.warning(f"保存到系统自选股失败: {e}")
+
+            # 2. 同步到 EastMoney（如可用）
+            em_added = 0
+            em_existing = 0
             if self._sync_mgr:
-                existing_list = self._sync_mgr.get_watchlist(group_name='自选股')
-                existing_codes = {s['code'] for s in existing_list}
+                try:
+                    em_list = self._sync_mgr.get_watchlist(group_name='自选股')
+                    em_codes = {s['code'] for s in em_list}
 
-                if request.clear_existing and existing_codes:
-                    self._sync_mgr.remove_stocks(list(existing_codes), group_name='自选股')
-                    existing_codes = set()
+                    if request.clear_existing and em_codes:
+                        self._sync_mgr.remove_stocks(list(em_codes), group_name='自选股')
+                        em_codes = set()
 
-                new_codes = [s.code for s in all_stocks if s.code not in existing_codes]
-                if new_codes:
-                    self._sync_mgr.add_stocks(new_codes, group_name='自选股')
-                    added = len(new_codes)
-                existing = len(all_codes) - added
+                    new_codes = [s.code for s in all_stocks if s.code not in em_codes]
+                    if new_codes:
+                        self._sync_mgr.add_stocks(new_codes, group_name='自选股')
+                        em_added = len(new_codes)
+                    em_existing = len(all_codes) - em_added
+                except Exception as e:
+                    logger.warning(f"同步到 EastMoney 失败: {e}")
 
             for cond_name, stocks in results.items():
                 msg = FavorPickResult()
@@ -157,8 +183,8 @@ class FavorNode(LanBaoBaseNode):
             response.success = True
             response.message = "选股完成"
             response.total_unique = len(all_stocks)
-            response.added = added
-            response.existing = existing
+            response.added = sys_added
+            response.existing = len(all_codes) - sys_added
             response.codes = list(all_codes)
 
         except Exception as e:

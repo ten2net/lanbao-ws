@@ -1,0 +1,9 @@
+string schedule_name
+---
+bool success
+string message
+string results_json
+---
+string current_step
+float64 progress
+string message

@@ -1,0 +1,5 @@
+string account_id
+string group_name
+---
+bool success
+FavorWatchlistItem[] items

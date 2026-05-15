@@ -27,6 +27,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/SystemMetrics.msg"
   "msg/DataTable.msg"
   "msg/ResearchReport.msg"
+  "msg/FavorPickResult.msg"
+  "msg/FavorWatchlistItem.msg"
 
   # 服务定义
   "srv/GetMarketData.srv"
@@ -43,13 +45,17 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/GetResearchReport.srv"
   "srv/GetFinancialData.srv"
   "srv/SaveResearchReport.srv"
+  "srv/FavorPick.srv"
+  "srv/FavorGetWatchlist.srv"
+  "srv/FavorManageCondition.srv"
 
   # 动作定义
   "action/BacktestStrategy.action"
   "action/DeployStrategy.action"
   "action/CircuitBreaker.action"
   "action/RunResearch.action"
-  
+  "action/FavorRunSchedule.action"
+
   DEPENDENCIES std_msgs builtin_interfaces
 )
 

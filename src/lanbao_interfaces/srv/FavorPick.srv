@@ -1,0 +1,10 @@
+string[] condition_names
+bool clear_existing
+string account_id
+---
+bool success
+string message
+int32 total_unique
+int32 added
+int32 existing
+string[] codes

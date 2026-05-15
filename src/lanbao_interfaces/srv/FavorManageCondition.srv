@@ -1,0 +1,7 @@
+string operation
+int32 condition_id
+string condition_json
+---
+bool success
+string message
+string conditions_json

@@ -68,6 +68,14 @@ data_sync:
   batch_report_interval: 100
   # 并发下载线程数（Tushare 100ms间隔，单线程约10 QPS）
   max_workers: 1
+  # 财务同步配置
+  financial_sync:
+    enabled: true
+    sync_day: 'sun'           # 周日执行（mon/tue/wed/thu/fri/sat/sun）
+    sync_time: '02:00'        # 凌晨 2 点
+    start_period: '20200101'  # 最早报告期
+    run_on_startup: false
+    batch_report_interval: 100  # 每 100 只股票报告进度
 
 # 节点配置
 nodes:

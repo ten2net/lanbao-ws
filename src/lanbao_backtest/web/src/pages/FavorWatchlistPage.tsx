@@ -36,7 +36,7 @@ export const FavorWatchlistPage: React.FC = () => {
 
   const handleSync = async () => {
     try {
-      await syncMutation.mutateAsync(emGroup);
+      await syncMutation.mutateAsync({ sys_group: '揽宝', em_group: emGroup });
     } catch {
       // error handled by hook
     }

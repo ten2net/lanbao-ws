@@ -85,9 +85,9 @@ export const favorApi = {
   getEastMoneyGroups: () =>
     apiClient.get<{ groups: EastMoneyGroup[] }>('/favor/eastmoney/groups').then(r => r.data),
 
-  syncToEastMoney: (group_name?: string) =>
+  syncToEastMoney: (sys_group?: string, em_group?: string) =>
     apiClient.post<EastMoneySyncResponse>('/favor/eastmoney/sync', null, {
-      params: { group_name }
+      params: { sys_group, em_group }
     }).then(r => r.data),
 
   listConditions: () =>

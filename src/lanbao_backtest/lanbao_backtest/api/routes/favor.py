@@ -350,32 +350,55 @@ async def get_eastmoney_groups():
 
 
 @router.post("/favor/eastmoney/sync")
-async def sync_to_eastmoney(group_name: str = Query("自选股")):
-    """将系统自选股同步到东方财富"""
+async def sync_to_eastmoney(
+    sys_group: str = Query("揽宝", description="系统内分组名"),
+    em_group: str = Query("自选股", description="EastMoney 目标分组名"),
+):
+    """将系统自选股同步到东方财富（通过 ROS2 Service 读取，避免 DuckDB 锁冲突）"""
     try:
-        from lanbao_favor.duckdb_storage import FavorStorage
+        from lanbao_interfaces.srv import FavorGetWatchlist
         from lanbao_favor.favor_sync_manager import FavorSyncManager
 
-        storage = FavorStorage()
-        try:
-            items = storage.list_watchlist(group_name=group_name)
-            codes = [item["code"] for item in items]
-        finally:
-            storage.close()
+        # 通过 ROS2 Service 从 favor_node 获取系统自选股
+        req = FavorGetWatchlist.Request()
+        req.account_id = ""
+        req.group_name = sys_group
+
+        response = _call_ros2_service(
+            FavorGetWatchlist, "/favor/get_watchlist", req, timeout_sec=10.0
+        )
+
+        if not response.success:
+            raise HTTPException(status_code=500, detail="获取系统自选股失败")
+
+        codes = [item.code for item in response.items]
 
         if not codes:
             return {"success": True, "message": "无自选股需要同步", "synced": 0}
 
         sync_mgr = FavorSyncManager()
-        success = sync_mgr.add_stocks(codes, group_name=group_name)
+        try:
+            success = sync_mgr.add_stocks(codes, group_name=em_group)
+        except Exception as e:
+            logger.error(f"EastMoney API 调用失败: {e}")
+            return {
+                "success": False,
+                "message": f"EastMoney 服务端拒绝连接（可能被限流或 IP 受限），请稍后重试或检查网络。详情: {e}",
+                "synced": len(codes),
+            }
 
         return {
             "success": success,
-            "message": "同步成功" if success else "同步失败",
+            "message": "同步成功" if success else "同步失败（EastMoney 返回失败，请检查凭证或网络）",
             "synced": len(codes),
         }
     except ValueError:
         raise HTTPException(status_code=503, detail="EastMoney 凭证未配置")
+    except HTTPException:
+        raise
+    except TimeoutError as e:
+        logger.error(f"同步超时: {e}")
+        raise HTTPException(status_code=504, detail=str(e))
     except Exception as e:
         logger.error(f"同步到 EastMoney 失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))

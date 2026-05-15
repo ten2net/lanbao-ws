@@ -59,13 +59,15 @@ export function useEastMoneyGroups() {
 export function useSyncToEastMoney() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (group_name?: string) => favorApi.syncToEastMoney(group_name),
+    mutationFn: ({ sys_group, em_group }: { sys_group?: string; em_group?: string }) =>
+      favorApi.syncToEastMoney(sys_group, em_group),
     onSuccess: (data) => {
       message.success(data.message || '同步成功');
       queryClient.invalidateQueries({ queryKey: [KEY, 'eastmoney'] });
     },
     onError: (error: any) => {
-      message.error(error?.response?.data?.detail || '同步失败');
+      const msg = error?.response?.data?.message || error?.response?.data?.detail || '同步失败';
+      message.error(msg);
     },
   });
 }

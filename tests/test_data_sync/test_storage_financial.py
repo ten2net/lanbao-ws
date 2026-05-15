@@ -84,3 +84,8 @@ class TestDuckDBStorageFinancial:
     def test_get_nonexistent_symbol_returns_empty(self, storage):
         result = storage.get_balance_sheet('999999.SZ')
         assert result.empty
+
+    def test_invalid_table_raises(self, storage):
+        df = pd.DataFrame({'ts_code': ['000001.SZ'], 'end_date': ['20241231'], 'total_assets': [1.0]})
+        with pytest.raises(ValueError, match="Invalid financial table"):
+            storage._save_financial_table('invalid_table', '000001.SZ', '20241231', df)

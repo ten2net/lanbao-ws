@@ -9,7 +9,7 @@ import duckdb
 import pandas as pd
 import numpy as np
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Set
 from pathlib import Path
 from loguru import logger
 
@@ -19,12 +19,14 @@ from .duckdb_lock import db_lock
 class DuckDBStorage:
     """
     DuckDB存储管理器
-    
+
     功能:
     - 股票数据存储
     - 高效查询
     - 数据缓存
     """
+
+    _ALLOWED_FINANCIAL_TABLES = {'balance_sheet', 'income_statement', 'cashflow_statement'}
     
     def __init__(self, db_path: str = "./data/lanbao.duckdb", read_only: bool = False, timeout: int = 30):
         """
@@ -813,6 +815,13 @@ class DuckDBStorage:
         return self._get_financial_table('cashflow_statement', symbol, period)
 
     def _save_financial_table(self, table: str, symbol: str, period: str, data: pd.DataFrame) -> bool:
+        """
+        保存财务报表数据（单条记录）。
+
+        注意：Tushare 财务接口每个报告期返回一条记录，因此只取 data.iloc[0]。
+        """
+        if table not in self._ALLOWED_FINANCIAL_TABLES:
+            raise ValueError(f"Invalid financial table: {table}")
         try:
             if data.empty:
                 return False
@@ -854,6 +863,8 @@ class DuckDBStorage:
             return False
 
     def _get_financial_table(self, table: str, symbol: str, period: Optional[str] = None) -> pd.DataFrame:
+        if table not in self._ALLOWED_FINANCIAL_TABLES:
+            raise ValueError(f"Invalid financial table: {table}")
         try:
             query = f"SELECT * FROM {table} WHERE symbol = ?"
             params = [symbol]
@@ -866,11 +877,22 @@ class DuckDBStorage:
             logger.error(f"查询 {symbol} {table} 失败: {e}")
             return pd.DataFrame()
 
-    def get_existing_financial_periods(self) -> Dict[str, set]:
+    def get_existing_financial_periods(self) -> Dict[str, Set[str]]:
+        """
+        获取所有股票已有的财务数据报告期。
+
+        返回所有三张表（balance_sheet, income_statement, cashflow_statement）
+        的并集，即只要任意一张表有该报告期数据，就认为已存在。
+
+        Returns:
+            Dict[str, Set[str]]: {symbol: {period1, period2, ...}}
+        """
         try:
             tables = ['balance_sheet', 'income_statement', 'cashflow_statement']
-            all_periods: Dict[str, set] = {}
+            all_periods: Dict[str, Set[str]] = {}
             for table in tables:
+                if table not in self._ALLOWED_FINANCIAL_TABLES:
+                    raise ValueError(f"Invalid financial table: {table}")
                 result = self._conn.execute(f"SELECT DISTINCT symbol, report_period FROM {table}").fetchall()
                 for symbol, period in result:
                     if symbol not in all_periods:

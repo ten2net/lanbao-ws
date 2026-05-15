@@ -28,9 +28,9 @@ mkdir -p logs
 
 # 基础PYTHONPATH (注意: lanbao_interfaces使用python3.11目录但包含python3.10的so文件)
 ROS_PYTHONPATH="/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages"
-LANBAO_INSTALL_PATHS="./install/lanbao_interfaces/lib/python3.10/site-packages:./install/lanbao_core/lib/python3.10/site-packages:./install/lanbao_data/lib/python3.10/site-packages:./install/lanbao_strategy/lib/python3.10/site-packages:./install/lanbao_backtest/lib/python3.10/site-packages:./install/lanbao_risk/lib/python3.10/site-packages:./install/lanbao_monitor/lib/python3.10/site-packages"
+LANBAO_INSTALL_PATHS="./install/lanbao_interfaces/lib/python3.10/site-packages:./install/lanbao_core/lib/python3.10/site-packages:./install/lanbao_data/lib/python3.10/site-packages:./install/lanbao_strategy/lib/python3.10/site-packages:./install/lanbao_backtest/lib/python3.10/site-packages:./install/lanbao_risk/lib/python3.10/site-packages:./install/lanbao_monitor/lib/python3.10/site-packages:./install/lanbao_ai_research/lib/python3.10/site-packages"
 # build目录包含实际的包代码(.egg-link指向这里)
-LANBAO_BUILD_PATHS="./build/lanbao_interfaces:./build/lanbao_core:./build/lanbao_data:./build/lanbao_strategy:./build/lanbao_backtest:./build/lanbao_risk:./build/lanbao_monitor"
+LANBAO_BUILD_PATHS="./build/lanbao_interfaces:./build/lanbao_core:./build/lanbao_data:./build/lanbao_strategy:./build/lanbao_backtest:./build/lanbao_risk:./build/lanbao_monitor:./build/lanbao_ai_research"
 
 # 停止已运行的同名节点
 stop_existing() {
@@ -45,6 +45,7 @@ stop_existing() {
         "risk") pids=$(pgrep -f "lanbao_risk\.risk_control_node") ;;
         "monitor") pids=$(pgrep -f "lanbao_monitor\.monitor_node") ;;
         "system_metrics") pids=$(pgrep -f "lanbao_monitor\.system_metrics_node") ;;
+        "ai_research") pids=$(pgrep -f "lanbao_ai_research\.ai_research_node") ;;
         "rosbridge_server") pids=$(pgrep -f "rosbridge_websocket_launch") ;;
     esac
 

@@ -91,3 +91,4 @@ log/
 .mcp.json
 data/
 node_modules/
+reports/

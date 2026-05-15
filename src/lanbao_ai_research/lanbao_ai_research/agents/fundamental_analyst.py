@@ -24,7 +24,7 @@ class FundamentalAnalyst(BaseAgent):
             prompt = self._format_prompt(
                 symbol=symbol,
                 name=financial.get("name", symbol),
-                financial_data=json.dumps(financial, ensure_ascii=False, indent=2)
+                financial_data=json.dumps(financial, ensure_ascii=False, indent=2, default=str)
             )
 
             response = await self._call_llm(

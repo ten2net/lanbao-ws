@@ -26,6 +26,10 @@ class ReportStore:
         markdown = self._to_markdown(report)
         filepath.write_text(markdown, encoding='utf-8')
 
+        # 同时保存 JSON，方便 Service 查询
+        json_filepath = date_dir / f"{report.report_id}.json"
+        json_filepath.write_text(report.to_json(), encoding='utf-8')
+
         # 保存元数据到 DuckDB（通过 Service）
         try:
             import asyncio
@@ -43,6 +47,36 @@ class ReportStore:
 
         logger.info(f"报告已保存: {filepath}")
         return str(filepath)
+
+    def load_json(self, report_id: str) -> Optional[str]:
+        """加载报告的 JSON 内容，旧报告无 JSON 时回退到 markdown"""
+        import json
+
+        for date_dir in self.storage_path.iterdir():
+            if date_dir.is_dir():
+                json_file = date_dir / f"{report_id}.json"
+                if json_file.exists():
+                    return json_file.read_text(encoding='utf-8')
+
+                # 回退：旧报告只有 markdown，包装为简化 JSON
+                md_file = date_dir / f"{report_id}.md"
+                if md_file.exists():
+                    markdown = md_file.read_text(encoding='utf-8')
+                    return json.dumps({
+                        "report_id": report_id,
+                        "report_type": "market_daily",
+                        "created_at": "",
+                        "summary": {
+                            "market_trend": markdown,
+                            "overall_verdict": "HOLD",
+                            "confidence": 0.5,
+                            "top_sectors": [],
+                            "risk_level": "中"
+                        },
+                        "stock_analyses": [],
+                        "portfolio_suggestions": {}
+                    }, ensure_ascii=False)
+        return None
 
     def load(self, report_id: str) -> Optional[str]:
         for date_dir in self.storage_path.iterdir():

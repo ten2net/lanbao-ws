@@ -1,5 +1,6 @@
 """AI 投研分析 ROS2 节点"""
 import asyncio
+import threading
 from datetime import datetime
 
 import rclpy
@@ -87,7 +88,8 @@ class AIResearchNode(LanBaoBaseNode):
             self._handle_get_report
         )
 
-    async def _handle_run_research(self, goal_handle):
+    def _handle_run_research(self, goal_handle):
+        """处理研报分析请求 — 后台异步执行，不阻塞 ROS2 executor"""
         request = goal_handle.request
         report_id = request.report_id or f"rpt_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         research_type = request.research_type
@@ -95,60 +97,57 @@ class AIResearchNode(LanBaoBaseNode):
 
         logger.info(f"收到分析请求: {report_id}, type={research_type}, symbols={symbols}")
 
-        feedback = RunResearch.Feedback()
-        feedback.current_agent = "orchestrator"
-        feedback.status = "running"
-        feedback.progress = 0.0
-        feedback.message = "开始分析..."
-        goal_handle.publish_feedback(feedback)
+        def _run_analysis():
+            """在后台线程中运行分析，不占用 executor"""
+            async def _async_analysis():
+                if research_type == "market_daily":
+                    report = await self._orchestrator.run_market_daily_research(
+                        symbols=symbols, report_id=report_id
+                    )
+                else:
+                    symbol = symbols[0] if symbols else "UNKNOWN"
+                    report = await self._orchestrator.run_stock_research(
+                        symbol=symbol, report_id=report_id
+                    )
+                filepath = self._report_store.save(report, self._data_client)
+                self._publish_report_notification(report)
+                logger.info(f"分析完成并保存: {report_id}, 路径: {filepath}")
 
-        try:
-            if research_type == "market_daily":
-                report = await self._orchestrator.run_market_daily_research(
-                    symbols=symbols, report_id=report_id
-                )
-            else:
-                symbol = symbols[0] if symbols else "UNKNOWN"
-                report = await self._orchestrator.run_stock_research(
-                    symbol=symbol, report_id=report_id
-                )
+            loop = asyncio.new_event_loop()
+            try:
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(_async_analysis())
+            except Exception as e:
+                logger.exception(f"分析执行失败: {e}")
+            finally:
+                loop.close()
 
-            filepath = self._report_store.save(report, self._data_client)
-            self._publish_report_notification(report)
+        # 启动后台守护线程执行分析，不等待其完成
+        threading.Thread(target=_run_analysis, daemon=True).start()
 
-            goal_handle.succeed()
-
-            result = RunResearch.Result()
-            result.success = True
-            result.report_id = report_id
-            result.report_path = filepath
-            result.error_message = ""
-
-            logger.info(f"分析完成: {report_id}")
-            return result
-        except Exception as e:
-            logger.exception(f"分析失败: {e}")
-            goal_handle.abort()
-
-            result = RunResearch.Result()
-            result.success = False
-            result.report_id = report_id
-            result.report_path = ""
-            result.error_message = str(e)
-            return result
+        # 立即返回，确保 ROS2 executor 不被阻塞，可继续处理 service response
+        goal_handle.succeed()
+        result = RunResearch.Result()
+        result.success = True
+        result.report_id = report_id
+        result.report_path = ""
+        result.error_message = ""
+        return result
 
     def _handle_get_report(self, request, response):
+        """直接查询本地 report store 的 JSON 文件"""
         try:
-            import asyncio
-            metadata = asyncio.run(self._data_client.get_report_metadata(request.report_id))
-            if metadata:
+            report_json = self._report_store.load_json(request.report_id)
+            if report_json:
                 response.found = True
-                response.report_json = metadata.get("report_json", "")
-                response.created_at = metadata.get("created_at", "")
+                response.report_json = report_json
+                response.created_at = ""
+                logger.info(f"报告已找到: {request.report_id}")
             else:
                 response.found = False
                 response.report_json = ""
                 response.created_at = ""
+                logger.warning(f"报告不存在: {request.report_id}")
         except Exception as e:
             logger.error(f"获取报告失败: {e}")
             response.found = False

@@ -39,7 +39,7 @@ class DeepSeekProvider(BaseLLMProvider):
                     }
                 )
                 response.raise_for_status()
-                data = await response.json()
+                data = response.json()
 
                 choice = data["choices"][0]
                 return LLMResponse(

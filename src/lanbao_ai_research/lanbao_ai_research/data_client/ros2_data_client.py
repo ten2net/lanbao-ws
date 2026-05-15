@@ -52,15 +52,15 @@ class ROS2DataClient:
 
         future = client.call_async(request)
 
-        # 使用 asyncio.wait_for 实现超时
-        try:
-            result = await asyncio.wait_for(
-                asyncio.wrap_future(future),
-                timeout=timeout
-            )
-            return result
-        except asyncio.TimeoutError:
-            raise TimeoutError(f"Service {client_name} 调用超时 ({timeout}s)")
+        # 手动轮询等待 future 完成（asyncio.wrap_future 不支持 rclpy.task.Future）
+        import time
+        start = time.time()
+        while not future.done():
+            if time.time() - start > timeout:
+                raise TimeoutError(f"Service {client_name} 调用超时 ({timeout}s)")
+            await asyncio.sleep(0.05)
+
+        return future.result()
 
     async def get_ohlcv(self, symbol: str, start_date: str, end_date: str,
                         freq: str = "daily") -> Optional[pd.DataFrame]:
@@ -81,7 +81,7 @@ class ROS2DataClient:
         data = []
         for item in response.data:
             data.append({
-                'date': item.date,
+                'timestamp': item.timestamp,
                 'open': item.open,
                 'high': item.high,
                 'low': item.low,
@@ -90,7 +90,7 @@ class ROS2DataClient:
             })
 
         df = pd.DataFrame(data)
-        df['date'] = pd.to_datetime(df['date'])
+        df['date'] = pd.to_datetime(df['timestamp'], unit='ms')
         df.set_index('date', inplace=True)
         return df.sort_index()
 

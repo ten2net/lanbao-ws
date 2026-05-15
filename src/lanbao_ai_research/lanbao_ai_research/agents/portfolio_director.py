@@ -33,7 +33,7 @@ class PortfolioDirector(BaseAgent):
         start = time.time()
 
         try:
-            macro_text = json.dumps(macro_report.data, ensure_ascii=False, indent=2) if macro_report.success else "宏观分析失败"
+            macro_text = json.dumps(macro_report.data, ensure_ascii=False, indent=2, default=str) if macro_report.success else "宏观分析失败"
 
             stock_texts = []
             for symbol, reports in stock_reports.items():
@@ -43,7 +43,7 @@ class PortfolioDirector(BaseAgent):
                     "technical": reports.get("technical", {}).data if reports.get("technical") else {},
                     "sentiment": reports.get("sentiment", {}).data if reports.get("sentiment") else {},
                 }
-                stock_texts.append(json.dumps(stock_info, ensure_ascii=False, indent=2))
+                stock_texts.append(json.dumps(stock_info, ensure_ascii=False, indent=2, default=str))
 
             prompt = self._format_prompt(
                 macro_report=macro_text,

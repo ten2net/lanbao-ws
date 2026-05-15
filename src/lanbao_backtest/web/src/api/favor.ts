@@ -36,6 +36,7 @@ export interface PickResponse {
   added: number;
   existing: number;
   codes: string[];
+  stocks: { code: string; name: string }[];
 }
 
 export interface EastMoneyWatchlistItem {

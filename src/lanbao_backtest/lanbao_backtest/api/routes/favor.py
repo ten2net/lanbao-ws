@@ -49,6 +49,7 @@ class FavorPickResponse(BaseModel):
     added: int
     existing: int
     codes: List[str]
+    stocks: List[dict] = []
 
 
 class WatchlistAddRequest(BaseModel):
@@ -172,13 +173,22 @@ async def favor_pick(request: FavorPickRequest):
 
         response = _call_ros2_service(FavorPick, "/favor/pick", req, timeout_sec=30.0)
 
+        # 获取股票名称
+        codes = list(response.codes)
+        quotes = _fetch_tx_quotes(codes)
+        stocks = [
+            {"code": code, "name": quotes.get(code, {}).get("name", "")}
+            for code in codes
+        ]
+
         return FavorPickResponse(
             success=response.success,
             message=response.message,
             total_unique=response.total_unique,
             added=response.added,
             existing=response.existing,
-            codes=list(response.codes),
+            codes=codes,
+            stocks=stocks,
         )
     except HTTPException:
         raise
@@ -190,7 +200,7 @@ async def favor_pick(request: FavorPickRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/favor/watchlist", response_model=List[WatchlistItemResponse])
+@router.get("/favor/watchlist")
 async def get_watchlist(
     account_id: Optional[str] = Query("default"),
     group_name: Optional[str] = Query(None),
@@ -210,19 +220,21 @@ async def get_watchlist(
         if not response.success:
             raise HTTPException(status_code=500, detail="获取自选股列表失败")
 
-        return [
-            WatchlistItemResponse(
-                code=item.code,
-                name=item.name,
-                account_id=item.account_id or "default",
-                group_name=item.group_name or "自选股",
-                source_condition=item.source_condition,
-                signal_type=item.signal_type,
-                confidence=item.confidence,
-                added_at=item.added_at or None,
-            )
-            for item in response.items
-        ]
+        return {
+            "items": [
+                {
+                    "code": item.code,
+                    "name": item.name,
+                    "account_id": item.account_id or "default",
+                    "group_name": item.group_name or "自选股",
+                    "source_condition": item.source_condition,
+                    "signal_type": item.signal_type,
+                    "confidence": item.confidence,
+                    "added_at": item.added_at or None,
+                }
+                for item in response.items
+            ]
+        }
     except HTTPException:
         raise
     except TimeoutError as e:

@@ -96,8 +96,10 @@ export const FavorPickPage: React.FC = () => {
                 </Text>
               </div>
               <div>
-                {result.codes.map((code) => (
-                  <Tag key={code} style={{ marginBottom: 4 }}>{code}</Tag>
+                {result.stocks?.map((stock) => (
+                  <Tag key={stock.code} style={{ marginBottom: 4 }}>
+                    {stock.code} {stock.name && `(${stock.name})`}
+                  </Tag>
                 ))}
               </div>
             </Space>

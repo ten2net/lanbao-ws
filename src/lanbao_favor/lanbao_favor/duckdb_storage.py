@@ -1,5 +1,6 @@
 """自选股模块 DuckDB 存储层"""
 import os
+from pathlib import Path
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 
@@ -7,16 +8,103 @@ import duckdb
 
 
 class FavorStorage:
-    """自选股数据存储"""
+    """自选股数据存储（使用独立数据库文件，避免与其他节点冲突）"""
 
-    def __init__(self, db_path: str = None):
-        self._db_path = db_path or os.getenv('DUCKDB_PATH', './data/lanbao.duckdb')
-        self._conn = duckdb.connect(self._db_path)
+    def __init__(self, db_path: str = None, read_only: bool = False):
+        self._db_path = db_path or os.getenv('FAVOR_DB_PATH', './data/favor.duckdb')
+        self._read_only = read_only
+        self._conn = None
+        Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
+        if not read_only:
+            self._init_tables()
+
+    def _ensure_conn(self):
+        """懒加载连接：按需打开，避免启动时抢占锁"""
+        if self._conn is None:
+            self._conn = duckdb.connect(self._db_path, read_only=self._read_only)
 
     def close(self):
-        self._conn.close()
+        if self._conn is not None:
+            try:
+                if not self._read_only:
+                    self._conn.execute("CHECKPOINT")
+            except Exception:
+                pass
+            self._conn.close()
+            self._conn = None
+
+    def _init_tables(self):
+        """初始化自选股相关表结构"""
+        self._ensure_conn()
+        # favor_conditions
+        self._conn.execute("CREATE SEQUENCE IF NOT EXISTS favor_condition_id_seq START 1;")
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS favor_conditions (
+                id INTEGER PRIMARY KEY DEFAULT nextval('favor_condition_id_seq'),
+                name VARCHAR NOT NULL,
+                query VARCHAR NOT NULL,
+                description VARCHAR,
+                enabled BOOLEAN DEFAULT true,
+                priority INTEGER DEFAULT 0,
+                max_results INTEGER DEFAULT 15,
+                filter_hot_sector BOOLEAN DEFAULT false,
+                filter_min_cap_yi DOUBLE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # favor_accounts
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS favor_accounts (
+                id VARCHAR PRIMARY KEY,
+                name VARCHAR NOT NULL,
+                env_prefix VARCHAR,
+                target_group VARCHAR DEFAULT '自选股',
+                enabled BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # favor_watchlist
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS favor_watchlist (
+                code VARCHAR NOT NULL,
+                name VARCHAR,
+                account_id VARCHAR DEFAULT 'default',
+                group_name VARCHAR DEFAULT '自选股',
+                source_condition VARCHAR,
+                signal_type VARCHAR,
+                confidence DOUBLE,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (code, account_id, group_name)
+            )
+        """)
+
+        # favor_pick_logs
+        self._conn.execute("CREATE SEQUENCE IF NOT EXISTS favor_pick_log_id_seq START 1;")
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS favor_pick_logs (
+                id INTEGER PRIMARY KEY DEFAULT nextval('favor_pick_log_id_seq'),
+                condition_id INTEGER,
+                condition_name VARCHAR,
+                picked_count INTEGER,
+                filtered_count INTEGER,
+                duration_ms INTEGER,
+                picked_codes VARCHAR[],
+                error_message VARCHAR,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Insert default account
+        self._conn.execute("""
+            INSERT OR IGNORE INTO favor_accounts (id, name, target_group, enabled)
+            VALUES ('default', '默认账户', '自选股', true)
+        """)
 
     def list_conditions(self, enabled_only: bool = False) -> List[Dict]:
+        self._ensure_conn()
         sql = "SELECT * FROM favor_conditions"
         if enabled_only:
             sql += " WHERE enabled = true"
@@ -26,6 +114,7 @@ class FavorStorage:
         return [dict(zip(columns, row)) for row in result]
 
     def get_condition(self, condition_id: int) -> Optional[Dict]:
+        self._ensure_conn()
         result = self._conn.execute(
             "SELECT * FROM favor_conditions WHERE id = ?", [condition_id]
         ).fetchone()
@@ -35,6 +124,7 @@ class FavorStorage:
         return dict(zip(columns, result))
 
     def save_condition(self, condition: Dict) -> int:
+        self._ensure_conn()
         now = datetime.now()
         if condition.get('id'):
             self._conn.execute("""
@@ -69,11 +159,13 @@ class FavorStorage:
             return result[0] if result else 0
 
     def delete_condition(self, condition_id: int) -> bool:
+        self._ensure_conn()
         self._conn.execute("DELETE FROM favor_conditions WHERE id = ?", [condition_id])
         result = self._conn.execute("SELECT * FROM favor_conditions WHERE id = ?", [condition_id]).fetchone()
         return result is None
 
     def list_watchlist(self, account_id: str = None, group_name: str = None) -> List[Dict]:
+        self._ensure_conn()
         sql = "SELECT * FROM favor_watchlist WHERE 1=1"
         params = []
         if account_id:
@@ -88,6 +180,7 @@ class FavorStorage:
         return [dict(zip(columns, row)) for row in result]
 
     def add_to_watchlist(self, item: Dict) -> bool:
+        self._ensure_conn()
         try:
             self._conn.execute("""
                 INSERT OR REPLACE INTO favor_watchlist
@@ -108,6 +201,7 @@ class FavorStorage:
             return False
 
     def remove_from_watchlist(self, code: str, account_id: str, group_name: str) -> bool:
+        self._ensure_conn()
         self._conn.execute(
             "DELETE FROM favor_watchlist WHERE code = ? AND account_id = ? AND group_name = ?",
             [code, account_id, group_name]
@@ -119,6 +213,7 @@ class FavorStorage:
         return result is None
 
     def clear_watchlist(self, account_id: str = None, group_name: str = None) -> int:
+        self._ensure_conn()
         # Count before delete
         count_sql = "SELECT COUNT(*) FROM favor_watchlist WHERE 1=1"
         count_params = []
@@ -142,6 +237,7 @@ class FavorStorage:
         return before
 
     def save_pick_log(self, log: Dict) -> int:
+        self._ensure_conn()
         self._conn.execute("""
             INSERT INTO favor_pick_logs
             (condition_id, condition_name, picked_count, filtered_count,
@@ -160,6 +256,7 @@ class FavorStorage:
         return result[0] if result else 0
 
     def list_pick_logs(self, limit: int = 50, offset: int = 0) -> List[Dict]:
+        self._ensure_conn()
         result = self._conn.execute(
             "SELECT * FROM favor_pick_logs ORDER BY created_at DESC LIMIT ? OFFSET ?",
             [limit, offset]

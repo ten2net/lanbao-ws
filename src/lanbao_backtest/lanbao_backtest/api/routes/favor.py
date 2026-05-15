@@ -1,5 +1,5 @@
 """自选股管理 API 路由"""
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
@@ -90,6 +90,75 @@ def _call_ros2_service(service_type, service_name: str, request, timeout_sec: fl
     return future.result()
 
 
+def _to_tx_code(code: str) -> str:
+    """将纯数字代码转换为腾讯财经格式"""
+    if not code:
+        return ""
+    prefix = code[:3]
+    if prefix in ('600', '601', '603', '605', '688'):
+        return f"sh{code}"
+    elif prefix in ('000', '001', '002', '003', '300', '301'):
+        return f"sz{code}"
+    elif prefix in ('430',) or code[0] in ('8', '9'):
+        return f"bj{code}"
+    else:
+        return f"sh{code}"
+
+
+def _fetch_tx_quotes(codes: List[str]) -> Dict[str, Dict]:
+    """调用腾讯财经 API 获取实时行情"""
+    import requests
+
+    if not codes:
+        return {}
+
+    tx_codes = [_to_tx_code(c) for c in codes]
+    url = f"https://qt.gtimg.cn/q={','.join(tx_codes)}"
+
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.encoding = 'GBK'
+        text = resp.text.strip()
+
+        quotes: Dict[str, Dict] = {}
+        for line in text.split(';'):
+            line = line.strip()
+            if not line.startswith('v_'):
+                continue
+
+            try:
+                prefix, data = line.split('="', 1)
+                tx_code = prefix.split('_')[1]
+                code = tx_code.replace('sh', '').replace('sz', '').replace('bj', '')
+                data = data.rstrip('"')
+                fields = data.split('~')
+
+                if len(fields) < 35:
+                    continue
+
+                price = float(fields[3]) if fields[3] else 0.0
+                change = float(fields[31]) if fields[31] else 0.0
+                change_pct = float(fields[32]) if fields[32] else 0.0
+                high = float(fields[33]) if fields[33] else 0.0
+                low = float(fields[34]) if fields[34] else 0.0
+
+                quotes[code] = {
+                    'name': fields[1],
+                    'price': price,
+                    'change': change,
+                    'change_pct': change_pct,
+                    'high': high,
+                    'low': low,
+                }
+            except (ValueError, IndexError):
+                continue
+
+        return quotes
+    except Exception as e:
+        logger.warning(f"获取腾讯行情失败: {e}")
+        return {}
+
+
 @router.post("/favor/pick", response_model=FavorPickResponse)
 async def favor_pick(request: FavorPickRequest):
     """执行选股并加入自选股"""
@@ -126,33 +195,39 @@ async def get_watchlist(
     account_id: Optional[str] = Query("default"),
     group_name: Optional[str] = Query(None),
 ):
-    """获取自选股列表（直接查询 DuckDB，不经过 ROS2）"""
+    """获取自选股列表（通过 ROS2 Service 调用 favor_node）"""
     try:
-        from lanbao_favor.duckdb_storage import FavorStorage
+        from lanbao_interfaces.srv import FavorGetWatchlist
 
-        storage = FavorStorage()
-        try:
-            items = storage.list_watchlist(
-                account_id=account_id or None,
-                group_name=group_name or None,
+        req = FavorGetWatchlist.Request()
+        req.account_id = account_id or ""
+        req.group_name = group_name or ""
+
+        response = _call_ros2_service(
+            FavorGetWatchlist, "/favor/get_watchlist", req, timeout_sec=10.0
+        )
+
+        if not response.success:
+            raise HTTPException(status_code=500, detail="获取自选股列表失败")
+
+        return [
+            WatchlistItemResponse(
+                code=item.code,
+                name=item.name,
+                account_id=item.account_id or "default",
+                group_name=item.group_name or "自选股",
+                source_condition=item.source_condition,
+                signal_type=item.signal_type,
+                confidence=item.confidence,
+                added_at=item.added_at or None,
             )
-            return [
-                WatchlistItemResponse(
-                    code=item["code"],
-                    name=item.get("name", ""),
-                    account_id=item.get("account_id", "default"),
-                    group_name=item.get("group_name", "自选股"),
-                    source_condition=item.get("source_condition", ""),
-                    signal_type=item.get("signal_type", ""),
-                    confidence=item.get("confidence", 0.0),
-                    added_at=str(item.get("added_at", "")) if item.get("added_at") else None,
-                )
-                for item in items
-            ]
-        finally:
-            storage.close()
+            for item in response.items
+        ]
     except HTTPException:
         raise
+    except TimeoutError as e:
+        logger.error(f"获取自选股超时: {e}")
+        raise HTTPException(status_code=504, detail=str(e))
     except Exception as e:
         logger.error(f"获取自选股列表失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -210,6 +285,87 @@ async def remove_from_watchlist(
         raise
     except Exception as e:
         logger.error(f"移除自选股失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/favor/eastmoney/watchlist")
+async def get_eastmoney_watchlist(group_name: str = Query("自选股")):
+    """从东方财富平台获取自选股列表（含腾讯财经实时行情）"""
+    try:
+        from lanbao_favor.favor_sync_manager import FavorSyncManager
+        sync_mgr = FavorSyncManager()
+        stocks = sync_mgr.get_watchlist(group_name=group_name)
+
+        # 获取腾讯财经实时行情
+        codes = [s['code'] for s in stocks]
+        quotes = _fetch_tx_quotes(codes)
+
+        items = []
+        for s in stocks:
+            code = s['code']
+            q = quotes.get(code, {})
+            items.append({
+                'code': code,
+                'name': q.get('name', s.get('name', '')),
+                'price': q.get('price', 0.0),
+                'change': q.get('change', 0.0),
+                'change_pct': q.get('change_pct', 0.0),
+                'high': q.get('high', 0.0),
+                'low': q.get('low', 0.0),
+            })
+
+        return {"items": items, "group_name": group_name}
+    except ValueError:
+        raise HTTPException(status_code=503, detail="EastMoney 凭证未配置，请在 .env 中设置 EASTMONEY_APPKEY 和 EASTMONEY_COOKIE")
+    except Exception as e:
+        logger.error(f"获取 EastMoney 自选股失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/favor/eastmoney/groups")
+async def get_eastmoney_groups():
+    """获取东方财富分组列表"""
+    try:
+        from lanbao_favor.favor_sync_manager import FavorSyncManager
+        sync_mgr = FavorSyncManager()
+        groups = sync_mgr.get_groups()
+        return {"groups": groups}
+    except ValueError:
+        raise HTTPException(status_code=503, detail="EastMoney 凭证未配置")
+    except Exception as e:
+        logger.error(f"获取 EastMoney 分组失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/favor/eastmoney/sync")
+async def sync_to_eastmoney(group_name: str = Query("自选股")):
+    """将系统自选股同步到东方财富"""
+    try:
+        from lanbao_favor.duckdb_storage import FavorStorage
+        from lanbao_favor.favor_sync_manager import FavorSyncManager
+
+        storage = FavorStorage()
+        try:
+            items = storage.list_watchlist(group_name=group_name)
+            codes = [item["code"] for item in items]
+        finally:
+            storage.close()
+
+        if not codes:
+            return {"success": True, "message": "无自选股需要同步", "synced": 0}
+
+        sync_mgr = FavorSyncManager()
+        success = sync_mgr.add_stocks(codes, group_name=group_name)
+
+        return {
+            "success": success,
+            "message": "同步成功" if success else "同步失败",
+            "synced": len(codes),
+        }
+    except ValueError:
+        raise HTTPException(status_code=503, detail="EastMoney 凭证未配置")
+    except Exception as e:
+        logger.error(f"同步到 EastMoney 失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -38,6 +38,27 @@ export interface PickResponse {
   codes: string[];
 }
 
+export interface EastMoneyWatchlistItem {
+  code: string;
+  name: string;
+  price: number;
+  change: number;
+  change_pct: number;
+  high: number;
+  low: number;
+}
+
+export interface EastMoneyGroup {
+  id: string;
+  name: string;
+}
+
+export interface EastMoneySyncResponse {
+  success: boolean;
+  message: string;
+  synced: number;
+}
+
 export const favorApi = {
   pick: (params: PickRequest) =>
     apiClient.post<PickResponse>('/favor/pick', params).then(r => r.data),
@@ -53,6 +74,19 @@ export const favorApi = {
   removeFromWatchlist: (code: string, account_id?: string, group_name?: string) =>
     apiClient.delete(`/favor/watchlist/${code}`, {
       params: { account_id, group_name }
+    }).then(r => r.data),
+
+  getEastMoneyWatchlist: (group_name?: string) =>
+    apiClient.get<{ items: EastMoneyWatchlistItem[]; group_name: string }>('/favor/eastmoney/watchlist', {
+      params: { group_name }
+    }).then(r => r.data),
+
+  getEastMoneyGroups: () =>
+    apiClient.get<{ groups: EastMoneyGroup[] }>('/favor/eastmoney/groups').then(r => r.data),
+
+  syncToEastMoney: (group_name?: string) =>
+    apiClient.post<EastMoneySyncResponse>('/favor/eastmoney/sync', null, {
+      params: { group_name }
     }).then(r => r.data),
 
   listConditions: () =>

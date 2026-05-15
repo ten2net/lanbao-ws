@@ -8,7 +8,7 @@ from lanbao_data import DuckDBStorage
 
 
 def migrate():
-    db_path = os.getenv('DUCKDB_PATH', './data/lanbao.duckdb')
+    db_path = os.getenv('FAVOR_DB_PATH', './data/favor.duckdb')
     storage = DuckDBStorage(db_path, read_only=False)
     conn = storage._conn
 

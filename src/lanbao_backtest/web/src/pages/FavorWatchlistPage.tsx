@@ -1,20 +1,29 @@
 import React, { useState } from 'react';
-import { Card, Table, Button, Tabs, Typography, Space, Tag, message, Popconfirm } from 'antd';
-import { EyeOutlined, DeleteOutlined } from '@ant-design/icons';
-import { useWatchlist, useRemoveFromWatchlist } from '../hooks/useFavor';
+import { Card, Table, Button, Tabs, Typography, Space, Tag, message, Popconfirm, Select, Alert, Spin } from 'antd';
+import { EyeOutlined, DeleteOutlined, SyncOutlined, CloudOutlined } from '@ant-design/icons';
+import { useWatchlist, useRemoveFromWatchlist, useEastMoneyWatchlist, useEastMoneyGroups, useSyncToEastMoney } from '../hooks/useFavor';
 
 const { Title } = Typography;
 
-const GROUPS = [
+const LOCAL_GROUPS = [
   { key: '自选股', label: '自选股' },
   { key: '揽宝', label: '揽宝' },
   { key: '短线', label: '短线' },
 ];
 
 export const FavorWatchlistPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('local');
   const [activeGroup, setActiveGroup] = useState('自选股');
-  const { data, isLoading, refetch } = useWatchlist(undefined, activeGroup);
+  const [emGroup, setEmGroup] = useState('自选股');
+
+  // 本地自选股
+  const { data: localData, isLoading: localLoading, refetch: refetchLocal } = useWatchlist(undefined, activeGroup);
   const removeMutation = useRemoveFromWatchlist();
+
+  // EastMoney 自选股
+  const { data: emData, isLoading: emLoading, refetch: refetchEm } = useEastMoneyWatchlist(emGroup);
+  const { data: emGroupsData } = useEastMoneyGroups();
+  const syncMutation = useSyncToEastMoney();
 
   const handleDelete = async (code: string) => {
     try {
@@ -25,7 +34,15 @@ export const FavorWatchlistPage: React.FC = () => {
     }
   };
 
-  const columns = [
+  const handleSync = async () => {
+    try {
+      await syncMutation.mutateAsync(emGroup);
+    } catch {
+      // error handled by hook
+    }
+  };
+
+  const localColumns = [
     { title: '代码', dataIndex: 'code', key: 'code' },
     { title: '名称', dataIndex: 'name', key: 'name' },
     { title: '来源', dataIndex: 'source_condition', key: 'source_condition' },
@@ -59,6 +76,138 @@ export const FavorWatchlistPage: React.FC = () => {
     },
   ];
 
+  const emColumns = [
+    { title: '代码', dataIndex: 'code', key: 'code', width: 90 },
+    { title: '名称', dataIndex: 'name', key: 'name', width: 120 },
+    {
+      title: '最新价',
+      dataIndex: 'price',
+      key: 'price',
+      width: 90,
+      align: 'right' as const,
+      render: (price: number) => price ? price.toFixed(2) : '-',
+    },
+    {
+      title: '涨跌额',
+      dataIndex: 'change',
+      key: 'change',
+      width: 90,
+      align: 'right' as const,
+      render: (change: number) => {
+        if (!change && change !== 0) return '-';
+        const color = change > 0 ? '#cf1322' : change < 0 ? '#3f8600' : '#666';
+        return <span style={{ color }}>{change > 0 ? '+' : ''}{change.toFixed(2)}</span>;
+      },
+    },
+    {
+      title: '涨跌幅',
+      dataIndex: 'change_pct',
+      key: 'change_pct',
+      width: 90,
+      align: 'right' as const,
+      render: (pct: number) => {
+        if (!pct && pct !== 0) return '-';
+        const color = pct > 0 ? '#cf1322' : pct < 0 ? '#3f8600' : '#666';
+        return <span style={{ color }}>{pct > 0 ? '+' : ''}{pct.toFixed(2)}%</span>;
+      },
+    },
+    {
+      title: '最高',
+      dataIndex: 'high',
+      key: 'high',
+      width: 90,
+      align: 'right' as const,
+      render: (high: number) => high ? high.toFixed(2) : '-',
+    },
+    {
+      title: '最低',
+      dataIndex: 'low',
+      key: 'low',
+      width: 90,
+      align: 'right' as const,
+      render: (low: number) => low ? low.toFixed(2) : '-',
+    },
+  ];
+
+  const emGroupOptions = emGroupsData?.groups.map((g: any) => ({ label: g.name, value: g.name })) || [];
+
+  const tabItems = [
+    {
+      key: 'local',
+      label: '系统自选股',
+      children: (
+        <>
+          <Tabs
+            activeKey={activeGroup}
+            onChange={setActiveGroup}
+            items={LOCAL_GROUPS.map(g => ({ key: g.key, label: g.label }))}
+            style={{ marginBottom: 16 }}
+          />
+          <Table
+            dataSource={localData?.items || []}
+            columns={localColumns}
+            rowKey="code"
+            loading={localLoading}
+            pagination={{ pageSize: 20 }}
+          />
+        </>
+      ),
+    },
+    {
+      key: 'eastmoney',
+      label: (
+        <span>
+          <CloudOutlined /> 东方财富
+        </span>
+      ),
+      children: (
+        <>
+          <Space style={{ marginBottom: 16 }}>
+            <span>分组:</span>
+            <Select
+              value={emGroup}
+              onChange={setEmGroup}
+              options={emGroupOptions.length > 0 ? emGroupOptions : [{ label: '自选股', value: '自选股' }]}
+              style={{ width: 160 }}
+            />
+            <Button icon={<SyncOutlined />} onClick={() => refetchEm()} loading={emLoading}>
+              刷新
+            </Button>
+            <Button
+              type="primary"
+              icon={<SyncOutlined spin={syncMutation.isPending} />}
+              onClick={handleSync}
+              loading={syncMutation.isPending}
+            >
+              同步到东方财富
+            </Button>
+          </Space>
+
+          {emData?.items === undefined && !emLoading && (
+            <Alert
+              message="无法获取东方财富自选股"
+              description="请确保 EastMoney 凭证已配置（EASTMONEY_APPKEY 和 EASTMONEY_COOKIE），且 favor_node 已启动。"
+              type="warning"
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
+          )}
+
+          <Spin spinning={emLoading}>
+            <Table
+              dataSource={emData?.items || []}
+              columns={emColumns}
+              rowKey="code"
+              pagination={{ pageSize: 20 }}
+              locale={{ emptyText: emLoading ? '加载中...' : '该分组下无自选股' }}
+              scroll={{ x: 'max-content' }}
+            />
+          </Spin>
+        </>
+      ),
+    },
+  ];
+
   return (
     <div style={{ padding: 24 }}>
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
@@ -67,18 +216,16 @@ export const FavorWatchlistPage: React.FC = () => {
             <Title level={4} style={{ margin: 0 }}>
               <EyeOutlined /> 自选股管理
             </Title>
-            <Button onClick={() => refetch()}>刷新</Button>
+            <Button onClick={() => {
+              if (activeTab === 'local') refetchLocal();
+              else refetchEm();
+            }}>
+              刷新
+            </Button>
           </Space>
         </Card>
         <Card>
-          <Tabs activeKey={activeGroup} onChange={setActiveGroup} items={GROUPS} />
-          <Table
-            dataSource={data?.items || []}
-            columns={columns}
-            rowKey="code"
-            loading={isLoading}
-            pagination={{ pageSize: 20 }}
-          />
+          <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
         </Card>
       </Space>
     </div>

@@ -1,10 +1,8 @@
 """EastMoney 自选股同步管理器"""
 import os
-import sys
 from typing import List, Dict
 from loguru import logger
 
-sys.path.insert(0, '/root/lanbao/tools/eastmoney-mcp-server/src')
 from eastmoney_mcp.api import EastMoneyAPI
 
 
@@ -12,6 +10,7 @@ class FavorSyncManager:
     """管理 EastMoney 自选股的同步操作"""
 
     def __init__(self, appkey: str = None, cookie: str = None):
+
         self._appkey = appkey or os.getenv('EASTMONEY_APPKEY')
         self._cookie = cookie or os.getenv('EASTMONEY_COOKIE')
 

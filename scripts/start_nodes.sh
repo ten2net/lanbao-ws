@@ -11,6 +11,14 @@ echo -e "${BLUE}=======================================${NC}"
 echo -e "${BLUE}  揽宝智能投研交易平台 - 节点启动器   ${NC}"
 echo -e "${BLUE}=======================================${NC}"
 
+# 加载环境变量
+if [ -f ".env" ]; then
+    set -a
+    source .env
+    set +a
+    echo -e "${GREEN}✓ 环境变量已加载 (.env)${NC}"
+fi
+
 # 加载ROS2环境
 source /opt/ros/humble/setup.bash
 

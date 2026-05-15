@@ -17,6 +17,14 @@ echo -e "${BLUE}=======================================${NC}"
 
 mkdir -p logs
 
+# 加载环境变量
+if [ -f ".env" ]; then
+    set -a
+    source .env
+    set +a
+    echo -e "${GREEN}✓ 环境变量已加载 (.env)${NC}"
+fi
+
 # 1. 启动 ROS2 节点
 echo ""
 echo -e "${BLUE}[1/3] 启动 ROS2 节点...${NC}"

@@ -82,6 +82,9 @@ data/processed/*
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Third-party tools (cloned as editable installs)
+third_party/
 outputs/
 Ubuntu22_x86_64_GPU.zip
 app.log
@@ -91,3 +94,4 @@ log/
 .mcp.json
 data/
 node_modules/
+reports/

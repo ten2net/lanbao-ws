@@ -42,8 +42,8 @@ class FavorNode(LanBaoBaseNode):
             try:
                 self._sync_mgr = FavorSyncManager()
                 logger.info("EastMoney 同步已初始化")
-            except ValueError:
-                logger.warning("EastMoney 凭证未配置，同步功能不可用")
+            except (ValueError, ImportError):
+                logger.warning("EastMoney 同步不可用")
                 self._sync_mgr = None
 
             self._schedule_mgr = ScheduleManager(
@@ -242,7 +242,8 @@ class FavorNode(LanBaoBaseNode):
         return True
 
     def stop(self):
-        self._schedule_mgr.stop()
+        if hasattr(self, '_schedule_mgr') and self._schedule_mgr:
+            self._schedule_mgr.stop()
         logger.info("FavorNode 停止")
         if self._storage:
             self._storage.close()

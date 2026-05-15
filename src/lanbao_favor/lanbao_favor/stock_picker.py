@@ -1,6 +1,5 @@
 """选股引擎 - 封装 stock-select 客户端"""
 import os
-import sys
 import time
 from typing import List, Dict, Optional, Set
 from dataclasses import dataclass
@@ -22,15 +21,22 @@ class StockPicker:
     """选股器 - 支持板块热度过滤和市值二次过滤"""
 
     def __init__(self):
-        sys.path.insert(0, '/root/lanbao/tools/stock-select/src')
-        from stock_select.client import StockSelector
-
-        self._selector = StockSelector()
+        self._selector = None
         self._hot_sector_codes: Optional[Set[str]] = None
+
+        try:
+            from stock_select.client import StockSelector
+            self._selector = StockSelector()
+        except ImportError:
+            logger.warning("stock-select 工具未安装，选股功能不可用")
 
     def pick(self, condition: FavorCondition) -> List[StockInfo]:
         start = time.time()
         logger.info(f"开始选股: {condition.name} -> {condition.query}")
+
+        if self._selector is None:
+            logger.warning("stock-select 不可用，跳过选股")
+            return []
 
         try:
             result = self._selector.select(condition.query, max_results=condition.max_results)
@@ -67,7 +73,6 @@ class StockPicker:
 
     def _filter_by_market_cap(self, stocks: List[StockInfo], min_cap_yi: float) -> List[StockInfo]:
         try:
-            sys.path.insert(0, '/root/lanbao/tools/eastmoney-mcp-server/src')
             from eastmoney_mcp.api import EastMoneyAPI
 
             appkey = os.getenv('EASTMONEY_APPKEY')
@@ -101,7 +106,6 @@ class StockPicker:
 
     def _filter_by_hot_sectors(self, stocks: List[StockInfo]) -> List[StockInfo]:
         try:
-            sys.path.insert(0, '/root/lanbao/tools/stock-select/src')
             from strategies.sector_rotation import SectorRotationTracker
 
             tracker = SectorRotationTracker()

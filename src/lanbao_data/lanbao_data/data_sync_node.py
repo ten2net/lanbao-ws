@@ -148,6 +148,33 @@ class DataSyncNode(LanBaoBaseNode):
                 else:
                     logger.info(f"数据同步节点已启动，将在每日 {self._schedule_time} 执行同步")
 
+            # 注册财务同步手动触发订阅
+            self._financial_sync_trigger_sub = self.create_subscription(
+                StdString,
+                '/data/trigger_financial_sync',
+                self._on_financial_sync_trigger,
+                10
+            )
+            logger.info("已注册财务同步手动触发订阅: /data/trigger_financial_sync")
+
+            # 创建财务同步定时器（每分钟检查）
+            self._financial_schedule_timer = self.create_timer(
+                60.0,
+                self._on_financial_schedule_check,
+                callback_group=self._callback_group
+            )
+
+            # 启动时执行一次财务同步（如果配置启用）
+            if self._financial_run_on_startup:
+                logger.info("配置为启动时立即执行财务同步")
+                self._trigger_financial_sync()
+            else:
+                if self._should_sync_financial_today():
+                    logger.info(f"今天符合财务同步条件 ({self._financial_sync_day} {self._financial_sync_time})，立即补同步")
+                    self._trigger_financial_sync()
+                else:
+                    logger.info(f"财务同步已配置，将在每周 {self._financial_sync_day} {self._financial_sync_time} 执行")
+
             return True
 
         except Exception as e:
@@ -166,6 +193,16 @@ class DataSyncNode(LanBaoBaseNode):
             # 销毁定时器
             if self._schedule_timer:
                 self.destroy_timer(self._schedule_timer)
+
+            # 等待财务同步线程结束
+            if self._financial_sync_thread and self._financial_sync_thread.is_alive():
+                logger.info("等待财务同步线程结束...")
+                self._financial_sync_running = False
+                self._financial_sync_thread.join(timeout=30)
+
+            # 销毁财务同步定时器
+            if self._financial_schedule_timer:
+                self.destroy_timer(self._financial_schedule_timer)
 
             logger.info("DataSyncNode 已停止")
 
@@ -208,6 +245,62 @@ class DataSyncNode(LanBaoBaseNode):
                 logger.warning(f"加载配置文件失败，使用默认配置: {e}")
         else:
             logger.warning(f"配置文件不存在: {config_path}，使用默认配置")
+
+    def _should_sync_financial_today(self) -> bool:
+        """判断今天是否需要执行财务同步"""
+        if not self._financial_sync_enabled or self._financial_sync_running:
+            return False
+
+        now = datetime.now()
+        current_time = now.strftime('%H:%M')
+        current_weekday = now.strftime('%a').lower()
+
+        day_map = {
+            'mon': 'mon', 'tue': 'tue', 'wed': 'wed',
+            'thu': 'thu', 'fri': 'fri', 'sat': 'sat', 'sun': 'sun'
+        }
+        target_day = day_map.get(self._financial_sync_day.lower(), 'sun')
+        if current_weekday != target_day:
+            return False
+
+        if current_time < self._financial_sync_time:
+            return False
+
+        if self._last_financial_sync_time:
+            last_date = self._last_financial_sync_time.date()
+            today = now.date()
+            if last_date == today:
+                return False
+
+        return True
+
+    def _on_financial_schedule_check(self):
+        """定时检查是否到达财务同步时间"""
+        if not self._financial_sync_enabled or self._financial_sync_running:
+            return
+        if self._should_sync_financial_today():
+            self._trigger_financial_sync()
+
+    def _on_financial_sync_trigger(self, msg: StdString):
+        """接收财务同步手动触发消息"""
+        logger.info(f"收到财务同步手动触发请求: {msg.data}")
+        self._trigger_financial_sync()
+
+    def _trigger_financial_sync(self):
+        """触发财务同步后台任务"""
+        if self._financial_sync_running:
+            logger.warning("财务同步任务已在运行中，跳过本次触发")
+            return
+
+        self._financial_sync_running = True
+        self._last_financial_sync_time = datetime.now()
+
+        self._financial_sync_thread = threading.Thread(
+            target=self._sync_financial_job,
+            daemon=True
+        )
+        self._financial_sync_thread.start()
+        logger.info("财务同步后台任务已启动")
 
     def _should_sync_today(self) -> bool:
         """判断今天是否需要同步（已过同步时间且今天未同步）"""
@@ -268,6 +361,122 @@ class DataSyncNode(LanBaoBaseNode):
         self._sync_thread.start()
 
         logger.info("后台同步任务已启动")
+
+    def _sync_financial_job(self):
+        """执行财务数据同步任务（在后台线程中运行）"""
+        start_time = time.time()
+        total_symbols = 0
+        success_count = 0
+        failed_count = 0
+        write_storage = None
+
+        try:
+            self._status.status = "SYNCING_FINANCIAL"
+
+            logger.info("正在获取A股股票列表（财务同步）...")
+            stock_list = self._adapter.get_stock_list(market='A')
+
+            if stock_list.empty:
+                logger.error("获取股票列表失败，财务同步终止")
+                return
+
+            total_symbols = len(stock_list)
+            logger.info(f"获取到 {total_symbols} 只股票")
+
+            logger.info("计算财务数据增量更新范围...")
+            sync_tasks = self._build_financial_sync_tasks(stock_list)
+            logger.info(f"需要同步的财务数据: {len(sync_tasks)} 条")
+
+            if not sync_tasks:
+                logger.info("财务数据已是最新，无需同步")
+                return
+
+            logger.info("正在获取数据库写入权限（财务同步）...")
+            db_path = os.getenv('DUCKDB_PATH', './data/lanbao.duckdb')
+
+            if self._storage:
+                self._storage.close()
+                self._storage = None
+
+            for attempt in range(60):
+                try:
+                    write_storage = DuckDBStorage(db_path, read_only=False)
+                    logger.info("获取数据库写入权限成功（财务同步）")
+                    break
+                except Exception as e:
+                    if attempt < 59:
+                        logger.debug(f"等待数据库锁释放... ({attempt+1}/60)")
+                        time.sleep(1)
+                    else:
+                        raise RuntimeError(f"无法获取数据库写入权限: {e}")
+
+            if not write_storage:
+                raise RuntimeError("无法获取数据库写入权限")
+
+            for i, task in enumerate(sync_tasks):
+                symbol = task['symbol']
+                period = task['period']
+
+                try:
+                    bs_data = self._adapter.get_balance_sheet(symbol, period=period)
+                    inc_data = self._adapter.get_income_statement(symbol, period=period)
+                    cf_data = self._adapter.get_cashflow_statement(symbol, period=period)
+
+                    saved = 0
+                    if not bs_data.empty:
+                        if write_storage.save_balance_sheet(symbol, period, bs_data):
+                            saved += 1
+                    if not inc_data.empty:
+                        if write_storage.save_income_statement(symbol, period, inc_data):
+                            saved += 1
+                    if not cf_data.empty:
+                        if write_storage.save_cashflow_statement(symbol, period, cf_data):
+                            saved += 1
+
+                    if saved == 3:
+                        success_count += 1
+                    else:
+                        failed_count += 1
+                        logger.warning(f"[{i+1}/{len(sync_tasks)}] {symbol} {period}: 部分报表缺失 ({saved}/3)")
+
+                    if (i + 1) % self._financial_batch_interval == 0:
+                        progress = (i + 1) / len(sync_tasks) * 100
+                        elapsed = time.time() - start_time
+                        rate = (i + 1) / elapsed if elapsed > 0 else 0
+                        remaining = (len(sync_tasks) - (i + 1)) / rate if rate > 0 else 0
+                        logger.info(f"财务同步进度: {i+1}/{len(sync_tasks)} ({progress:.1f}%), "
+                                   f"成功 {success_count}, 失败 {failed_count}, "
+                                   f"预计剩余 {remaining/60:.0f}分钟")
+
+                except Exception as e:
+                    logger.error(f"[{i+1}/{len(sync_tasks)}] {symbol} {period}: 同步失败 - {e}")
+                    failed_count += 1
+
+            elapsed = time.time() - start_time
+            message = (f"财务同步完成: 成功 {success_count}/{len(sync_tasks)}, "
+                      f"失败 {failed_count}, 耗时 {elapsed:.1f}秒")
+            logger.info(message)
+            self._publish_alert("INFO", message, component="data_sync_financial")
+
+        except Exception as e:
+            elapsed = time.time() - start_time
+            message = f"财务同步异常: {str(e)}, 耗时 {elapsed:.1f}秒"
+            logger.error(message)
+            self._publish_alert("ERROR", message, component="data_sync_financial")
+
+        finally:
+            if write_storage:
+                write_storage.close()
+
+            self._financial_sync_running = False
+            self._financial_sync_stats = {
+                'total': total_symbols,
+                'synced': success_count,
+                'failed': failed_count,
+                'elapsed': time.time() - start_time,
+                'last_sync': datetime.now().isoformat()
+            }
+            self._status.status = "RUNNING"
 
     def _sync_job(self):
         """

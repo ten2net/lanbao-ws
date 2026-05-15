@@ -58,3 +58,53 @@ class TestFinancialSyncLogic:
         stock_list = pd.DataFrame({'symbol': []})
         tasks = node._build_financial_sync_tasks(stock_list)
         assert tasks == []
+
+    @patch('lanbao_data.data_sync_node.TushareAdapter')
+    @patch('lanbao_data.data_sync_node.LanBaoBaseNode.__init__', return_value=None)
+    def test_should_sync_financial_today(self, mock_base_init, mock_adapter_cls):
+        """测试周日判断逻辑"""
+        node = DataSyncNode.__new__(DataSyncNode)
+        node._financial_sync_enabled = True
+        node._financial_sync_running = False
+        node._financial_sync_day = 'sun'
+        node._financial_sync_time = '02:00'
+        node._last_financial_sync_time = None
+
+        # Sunday at 3 AM
+        with patch('lanbao_data.data_sync_node.datetime') as mock_dt:
+            mock_now = Mock()
+            mock_now.strftime.side_effect = ['03:00', 'sun']  # time, weekday
+            mock_now.date.return_value = datetime(2026, 5, 10).date()
+            mock_dt.now.return_value = mock_now
+
+            assert node._should_sync_financial_today()
+
+    @patch('lanbao_data.data_sync_node.TushareAdapter')
+    @patch('lanbao_data.data_sync_node.LanBaoBaseNode.__init__', return_value=None)
+    def test_should_not_sync_wrong_day(self, mock_base_init, mock_adapter_cls):
+        """测试非配置日不触发"""
+        node = DataSyncNode.__new__(DataSyncNode)
+        node._financial_sync_enabled = True
+        node._financial_sync_running = False
+        node._financial_sync_day = 'sun'
+        node._financial_sync_time = '02:00'
+        node._last_financial_sync_time = None
+
+        # Monday at 3 AM
+        with patch('lanbao_data.data_sync_node.datetime') as mock_dt:
+            mock_now = Mock()
+            mock_now.strftime.side_effect = ['03:00', 'mon']
+            mock_now.date.return_value = datetime(2026, 5, 11).date()
+            mock_dt.now.return_value = mock_now
+
+            assert not node._should_sync_financial_today()
+
+    @patch('lanbao_data.data_sync_node.TushareAdapter')
+    @patch('lanbao_data.data_sync_node.LanBaoBaseNode.__init__', return_value=None)
+    def test_trigger_financial_sync_prevents_duplicate(self, mock_base_init, mock_adapter_cls):
+        """测试重复触发被阻止"""
+        node = DataSyncNode.__new__(DataSyncNode)
+        node._financial_sync_running = True
+
+        node._trigger_financial_sync()
+        assert node._financial_sync_running  # Still running, not changed

@@ -246,6 +246,51 @@ class DuckDBStorage:
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_research_reports_type ON research_reports(report_type)")
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_research_reports_created ON research_reports(created_at DESC)")
 
+        # 资产负债表
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS balance_sheet (
+                symbol VARCHAR NOT NULL,
+                report_period VARCHAR NOT NULL,
+                ann_date VARCHAR,
+                total_assets DOUBLE,
+                total_liab DOUBLE,
+                total_hldr_eqy_exc_min_int DOUBLE,
+                raw_json VARCHAR,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (symbol, report_period)
+            )
+        """)
+
+        # 利润表
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS income_statement (
+                symbol VARCHAR NOT NULL,
+                report_period VARCHAR NOT NULL,
+                ann_date VARCHAR,
+                revenue DOUBLE,
+                operate_profit DOUBLE,
+                net_income DOUBLE,
+                raw_json VARCHAR,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (symbol, report_period)
+            )
+        """)
+
+        # 现金流量表
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS cashflow_statement (
+                symbol VARCHAR NOT NULL,
+                report_period VARCHAR NOT NULL,
+                ann_date VARCHAR,
+                n_cashflow_act DOUBLE,
+                n_cashflow_inv_act DOUBLE,
+                f_cashflow_act DOUBLE,
+                raw_json VARCHAR,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (symbol, report_period)
+            )
+        """)
+
         # 迁移：为旧表添加复权相关列
         self._migrate_stock_daily()
 
@@ -748,6 +793,93 @@ class DuckDBStorage:
         except Exception as e:
             logger.error(f"获取同步状态失败: {e}")
             return None
+
+    def save_balance_sheet(self, symbol: str, period: str, data: pd.DataFrame) -> bool:
+        return self._save_financial_table('balance_sheet', symbol, period, data)
+
+    def get_balance_sheet(self, symbol: str, period: Optional[str] = None) -> pd.DataFrame:
+        return self._get_financial_table('balance_sheet', symbol, period)
+
+    def save_income_statement(self, symbol: str, period: str, data: pd.DataFrame) -> bool:
+        return self._save_financial_table('income_statement', symbol, period, data)
+
+    def get_income_statement(self, symbol: str, period: Optional[str] = None) -> pd.DataFrame:
+        return self._get_financial_table('income_statement', symbol, period)
+
+    def save_cashflow_statement(self, symbol: str, period: str, data: pd.DataFrame) -> bool:
+        return self._save_financial_table('cashflow_statement', symbol, period, data)
+
+    def get_cashflow_statement(self, symbol: str, period: Optional[str] = None) -> pd.DataFrame:
+        return self._get_financial_table('cashflow_statement', symbol, period)
+
+    def _save_financial_table(self, table: str, symbol: str, period: str, data: pd.DataFrame) -> bool:
+        try:
+            if data.empty:
+                return False
+            df = data.copy()
+            ann_date = df['ann_date'].iloc[0] if 'ann_date' in df.columns else None
+            raw_json = json.dumps(df.to_dict(orient='records'), ensure_ascii=False)
+
+            if table == 'balance_sheet':
+                total_assets = float(df['total_assets'].iloc[0]) if 'total_assets' in df.columns else None
+                total_liab = float(df['total_liab'].iloc[0]) if 'total_liab' in df.columns else None
+                total_eqy = float(df['total_hldr_eqy_exc_min_int'].iloc[0]) if 'total_hldr_eqy_exc_min_int' in df.columns else None
+                self._conn.execute(f"""
+                    INSERT OR REPLACE INTO {table} (symbol, report_period, ann_date, total_assets, total_liab, total_hldr_eqy_exc_min_int, raw_json, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, [symbol, period, ann_date, total_assets, total_liab, total_eqy, raw_json])
+
+            elif table == 'income_statement':
+                revenue = float(df['revenue'].iloc[0]) if 'revenue' in df.columns else None
+                operate_profit = float(df['operate_profit'].iloc[0]) if 'operate_profit' in df.columns else None
+                net_income = float(df['net_income'].iloc[0]) if 'net_income' in df.columns else None
+                self._conn.execute(f"""
+                    INSERT OR REPLACE INTO {table} (symbol, report_period, ann_date, revenue, operate_profit, net_income, raw_json, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, [symbol, period, ann_date, revenue, operate_profit, net_income, raw_json])
+
+            elif table == 'cashflow_statement':
+                n_cashflow_act = float(df['n_cashflow_act'].iloc[0]) if 'n_cashflow_act' in df.columns else None
+                n_cashflow_inv = float(df['n_cashflow_inv_act'].iloc[0]) if 'n_cashflow_inv_act' in df.columns else None
+                f_cashflow = float(df['f_cashflow_act'].iloc[0]) if 'f_cashflow_act' in df.columns else None
+                self._conn.execute(f"""
+                    INSERT OR REPLACE INTO {table} (symbol, report_period, ann_date, n_cashflow_act, n_cashflow_inv_act, f_cashflow_act, raw_json, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, [symbol, period, ann_date, n_cashflow_act, n_cashflow_inv, f_cashflow, raw_json])
+
+            logger.debug(f"保存 {symbol} {table}: {period}")
+            return True
+        except Exception as e:
+            logger.error(f"保存 {symbol} {table} 失败 ({period}): {e}")
+            return False
+
+    def _get_financial_table(self, table: str, symbol: str, period: Optional[str] = None) -> pd.DataFrame:
+        try:
+            query = f"SELECT * FROM {table} WHERE symbol = ?"
+            params = [symbol]
+            if period:
+                query += " AND report_period = ?"
+                params.append(period)
+            query += " ORDER BY report_period DESC"
+            return self._conn.execute(query, params).fetchdf()
+        except Exception as e:
+            logger.error(f"查询 {symbol} {table} 失败: {e}")
+            return pd.DataFrame()
+
+    def get_existing_financial_periods(self) -> Dict[str, set]:
+        try:
+            tables = ['balance_sheet', 'income_statement', 'cashflow_statement']
+            all_periods: Dict[str, set] = {}
+            for table in tables:
+                result = self._conn.execute(f"SELECT DISTINCT symbol, report_period FROM {table}").fetchall()
+                for symbol, period in result:
+                    if symbol not in all_periods:
+                        all_periods[symbol] = set()
+                    all_periods[symbol].add(period)
+            return all_periods
+        except Exception as e:
+            logger.error(f"查询已有财务报告期失败: {e}")
+            return {}
 
     def save_research_report(self, report_id: str, report_type: str,
                              symbols: Optional[List[str]], summary: str,

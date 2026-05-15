@@ -31,6 +31,8 @@ class TushareAdapter:
         self._pro = ts.pro_api(self._token)
         self._last_request_time = 0
         self._min_interval = 0.1  # 最小请求间隔(秒)
+        self._financial_interval = 0.75   # 80 req/min ≈ 0.75s per request
+        self._last_financial_request = 0
         self._priority = 1  # 数据源优先级
         
         logger.info("Tushare适配器初始化完成")
@@ -51,12 +53,17 @@ class TushareAdapter:
             logger.error(f"Tushare连接测试失败: {e}")
             return False
     
-    def _rate_limit(self):
+    def _rate_limit(self, financial=False):
         """速率限制"""
-        elapsed = time.time() - self._last_request_time
-        if elapsed < self._min_interval:
-            time.sleep(self._min_interval - elapsed)
-        self._last_request_time = time.time()
+        interval = self._financial_interval if financial else self._min_interval
+        last = self._last_financial_request if financial else self._last_request_time
+        elapsed = time.time() - last
+        if elapsed < interval:
+            time.sleep(interval - elapsed)
+        if financial:
+            self._last_financial_request = time.time()
+        else:
+            self._last_request_time = time.time()
     
     def get_daily_data(self, symbol: str, start_date: Optional[str] = None,
                        end_date: Optional[str] = None,
@@ -333,18 +340,60 @@ class TushareAdapter:
     def _convert_symbol(self, symbol: str) -> str:
         """
         转换股票代码格式
-        
+
         Args:
             symbol: 原始代码，如 '000001' 或 '000001.SZ'
-            
+
         Returns:
             Tushare格式代码，如 '000001.SZ'
         """
         if '.' in symbol:
             return symbol
-        
+
         # 根据代码规则判断交易所
         if symbol.startswith('6'):
             return f"{symbol}.SH"
         else:
             return f"{symbol}.SZ"
+
+    def get_balance_sheet(self, symbol: str, period: str) -> pd.DataFrame:
+        try:
+            self._rate_limit(financial=True)
+            ts_code = self._convert_symbol(symbol)
+            df = self._pro.balancesheet(ts_code=ts_code, period=period)
+            if df is None or df.empty:
+                logger.warning(f"未获取到 {symbol} 的资产负债表: {period}")
+                return pd.DataFrame()
+            logger.debug(f"获取 {symbol} 资产负债表: {period}, {len(df)} 条")
+            return df
+        except Exception as e:
+            logger.error(f"获取 {symbol} 资产负债表失败 ({period}): {e}")
+            return pd.DataFrame()
+
+    def get_income_statement(self, symbol: str, period: str) -> pd.DataFrame:
+        try:
+            self._rate_limit(financial=True)
+            ts_code = self._convert_symbol(symbol)
+            df = self._pro.income(ts_code=ts_code, period=period)
+            if df is None or df.empty:
+                logger.warning(f"未获取到 {symbol} 的利润表: {period}")
+                return pd.DataFrame()
+            logger.debug(f"获取 {symbol} 利润表: {period}, {len(df)} 条")
+            return df
+        except Exception as e:
+            logger.error(f"获取 {symbol} 利润表失败 ({period}): {e}")
+            return pd.DataFrame()
+
+    def get_cashflow_statement(self, symbol: str, period: str) -> pd.DataFrame:
+        try:
+            self._rate_limit(financial=True)
+            ts_code = self._convert_symbol(symbol)
+            df = self._pro.cashflow(ts_code=ts_code, period=period)
+            if df is None or df.empty:
+                logger.warning(f"未获取到 {symbol} 的现金流量表: {period}")
+                return pd.DataFrame()
+            logger.debug(f"获取 {symbol} 现金流量表: {period}, {len(df)} 条")
+            return df
+        except Exception as e:
+            logger.error(f"获取 {symbol} 现金流量表失败 ({period}): {e}")
+            return pd.DataFrame()

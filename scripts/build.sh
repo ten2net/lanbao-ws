@@ -21,6 +21,7 @@ colcon build --packages-select \
     lanbao_risk \
     lanbao_monitor \
     lanbao_ai_research \
+    lanbao_favor \
     --symlink-install
 
 if [ $? -eq 0 ]; then

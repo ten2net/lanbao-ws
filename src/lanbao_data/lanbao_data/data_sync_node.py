@@ -312,8 +312,6 @@ class DataSyncNode(LanBaoBaseNode):
                 return
             self._financial_sync_running = True
 
-        self._last_financial_sync_time = datetime.now()
-
         self._financial_sync_thread = threading.Thread(target=self._sync_financial_job, daemon=True)
         self._financial_sync_thread.start()
         logger.info("财务同步后台任务已启动")
@@ -370,7 +368,6 @@ class DataSyncNode(LanBaoBaseNode):
             return
 
         self._sync_running = True
-        self._last_sync_time = datetime.now()
 
         # 在后台线程中执行同步
         self._sync_thread = threading.Thread(target=self._sync_job, daemon=True)
@@ -406,6 +403,8 @@ class DataSyncNode(LanBaoBaseNode):
             if not sync_tasks:
                 logger.info("财务数据已是最新，无需同步")
                 return
+
+            self._last_financial_sync_time = datetime.now()
 
             logger.info("正在获取数据库写入权限（财务同步）...")
             db_path = os.getenv("DUCKDB_PATH", "./data/lanbao.duckdb")
@@ -534,6 +533,8 @@ class DataSyncNode(LanBaoBaseNode):
             if not sync_tasks:
                 logger.info("所有数据已是最新，无需同步")
                 return
+
+            self._last_sync_time = datetime.now()
 
             # 步骤3: 关闭只读连接，获取写入连接
             logger.info("正在获取数据库写入权限...")

@@ -12,7 +12,7 @@ from lanbao_core.base_node import LanBaoBaseNode
 from lanbao_core.config import NodeConfig
 from lanbao_interfaces.srv import FavorPick, FavorGetWatchlist, FavorManageCondition
 from lanbao_interfaces.action import FavorRunSchedule
-from lanbao_interfaces.msg import FavorPickResult, FavorWatchlistItem
+from lanbao_interfaces.msg import FavorPickResult, FavorWatchlistItem, StockSignal
 
 from .duckdb_storage import FavorStorage
 from .condition_manager import ConditionManager
@@ -55,6 +55,7 @@ class FavorNode(LanBaoBaseNode):
             self._setup_services()
             self._setup_action_server()
             self._setup_publisher()
+            self._setup_signal_subscription()
             logger.info("FavorNode 初始化完成")
             return True
         except Exception as e:
@@ -79,6 +80,29 @@ class FavorNode(LanBaoBaseNode):
         self._pick_publisher = self.create_publisher(
             FavorPickResult, '/favor/pick_result', self._qos_profiles['default']
         )
+
+    def _setup_signal_subscription(self):
+        self._signal_subscription = self.create_subscription(
+            StockSignal,
+            '/strategy/signals',
+            self._on_strategy_signal,
+            self._qos_profiles['default']
+        )
+        logger.info("FavorNode 策略信号订阅已注册")
+
+    def _on_strategy_signal(self, msg):
+        """处理策略信号，BUY 信号自动添加到自选股"""
+        if msg.signal == 'BUY':
+            logger.info(f"收到 BUY 信号: {msg.symbol}")
+            try:
+                self._storage.add_to_watchlist({
+                    'code': msg.symbol,
+                    'signal_type': msg.strategy_id or 'strategy',
+                    'source_condition': '策略信号',
+                    'group_name': '揽宝',
+                })
+            except Exception as e:
+                logger.error(f"同步策略信号到自选股失败: {e}")
 
     def _handle_pick(self, request, response):
         try:

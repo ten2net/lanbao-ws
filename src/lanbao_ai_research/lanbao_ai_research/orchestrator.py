@@ -1,5 +1,7 @@
 """Agent Orchestrator — 智能体调度中心"""
 import asyncio
+import os
+import sys
 import time
 from typing import List, Dict, Any, Optional
 from datetime import datetime
@@ -29,8 +31,15 @@ class AgentOrchestrator:
         self.sentiment_news_analyst = SentimentNewsAnalyst(llm_client)
         self.portfolio_director = PortfolioDirector(llm_client)
 
-    async def run_market_daily_research(self, symbols: List[str],
+    async def run_market_daily_research(self, symbols: List[str] = None,
                                         report_id: str = None) -> ResearchReport:
+        if symbols is None:
+            symbols = await self._get_favor_symbols()
+
+        if not symbols:
+            symbols = ["000001", "600519", "000858", "002594", "601012",
+                       "600036", "000333", "600900", "601318", "000002"]
+
         if report_id is None:
             report_id = f"rpt_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
@@ -102,6 +111,19 @@ class AgentOrchestrator:
         except Exception as e:
             logger.warning(f"获取 {symbol} 数据失败: {e}")
             return None
+
+    async def _get_favor_symbols(self) -> List[str]:
+        """从自选股获取股票列表"""
+        try:
+            import os
+            sys.path.insert(0, 'src')
+            from lanbao_favor.duckdb_storage import FavorStorage
+            storage = FavorStorage()
+            items = storage.list_watchlist()
+            storage.close()
+            return list(set(item['code'] for item in items))
+        except Exception:
+            return []
 
     async def run_stock_research(self, symbol: str, report_id: str = None) -> ResearchReport:
         if report_id is None:

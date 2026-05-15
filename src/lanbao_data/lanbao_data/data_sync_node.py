@@ -62,6 +62,23 @@ class DataSyncNode(LanBaoBaseNode):
         # 定时器
         self._schedule_timer = None
 
+        # 财务同步配置
+        self._financial_sync_enabled = True
+        self._financial_sync_day = 'sun'
+        self._financial_sync_time = '02:00'
+        self._financial_start_period = '20200101'
+        self._financial_run_on_startup = False
+        self._financial_batch_interval = 100
+
+        # 财务同步运行状态
+        self._financial_sync_thread: Optional[threading.Thread] = None
+        self._financial_sync_running = False
+        self._last_financial_sync_time: Optional[datetime] = None
+        self._financial_sync_stats: Dict[str, Any] = {}
+
+        # 财务同步定时器
+        self._financial_schedule_timer = None
+
         logger.info("DataSyncNode 初始化完成")
 
     def initialize(self) -> bool:
@@ -174,6 +191,18 @@ class DataSyncNode(LanBaoBaseNode):
 
                 logger.info(f"加载同步配置: start_date={self._sync_start_date}, "
                            f"schedule={self._schedule_time}, enabled={self._sync_enabled}")
+
+                # 加载财务同步配置
+                financial_config = config.get('data_sync', {}).get('financial_sync', {})
+                self._financial_sync_enabled = financial_config.get('enabled', True)
+                self._financial_sync_day = financial_config.get('sync_day', 'sun')
+                self._financial_sync_time = financial_config.get('sync_time', '02:00')
+                self._financial_start_period = financial_config.get('start_period', '20200101')
+                self._financial_run_on_startup = financial_config.get('run_on_startup', False)
+                self._financial_batch_interval = financial_config.get('batch_report_interval', 100)
+
+                logger.info(f"加载财务同步配置: enabled={self._financial_sync_enabled}, "
+                           f"day={self._financial_sync_day}, time={self._financial_sync_time}")
 
             except Exception as e:
                 logger.warning(f"加载配置文件失败，使用默认配置: {e}")
@@ -464,6 +493,70 @@ class DataSyncNode(LanBaoBaseNode):
             if read_storage:
                 read_storage.close()
 
+        return tasks
+
+    def _generate_report_periods(self, start_date_str: str) -> List[str]:
+        """
+        生成从起始日期到当前日期的所有季度末报告期
+
+        Args:
+            start_date_str: 起始日期 'YYYYMMDD'
+
+        Returns:
+            报告期列表 ['YYYYMMDD', ...]
+        """
+        start_year = int(start_date_str[:4])
+        current_date = datetime.now()
+        current_year = current_date.year
+
+        periods = []
+        for year in range(start_year, current_year + 1):
+            for month, day in [(3, 31), (6, 30), (9, 30), (12, 31)]:
+                period_date = datetime(year, month, day)
+                if period_date <= current_date:
+                    periods.append(period_date.strftime('%Y%m%d'))
+
+        return periods
+
+    def _build_financial_sync_tasks(self, stock_list: pd.DataFrame) -> List[Dict[str, Any]]:
+        """
+        构建财务同步任务，只同步缺失的报告期
+
+        Args:
+            stock_list: 股票列表 DataFrame
+
+        Returns:
+            同步任务列表，每个任务包含 symbol 和 period
+        """
+        periods = self._generate_report_periods(self._financial_start_period)
+        if not periods:
+            return []
+
+        read_storage = None
+        existing: Dict[str, set] = {}
+
+        try:
+            db_path = os.getenv('DUCKDB_PATH', './data/lanbao.duckdb')
+            read_storage = DuckDBStorage(db_path, read_only=True)
+            existing = read_storage.get_existing_financial_periods()
+        except Exception as e:
+            logger.warning(f"读取已有财务数据失败，将全量同步: {e}")
+        finally:
+            if read_storage:
+                read_storage.close()
+
+        tasks = []
+        for _, row in stock_list.iterrows():
+            symbol = row['symbol']
+            symbol_existing = existing.get(symbol, set())
+            for period in periods:
+                if period not in symbol_existing:
+                    tasks.append({
+                        'symbol': symbol,
+                        'period': period
+                    })
+
+        logger.info(f"财务同步任务: 共 {len(tasks)} 个 (股票 {len(stock_list)} 只, 报告期 {len(periods)} 个)")
         return tasks
 
     def _download_sequential(self, tasks: List[Dict[str, Any]], storage: DuckDBStorage) -> tuple:

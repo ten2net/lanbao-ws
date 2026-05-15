@@ -1,0 +1,66 @@
+import { apiClient } from './client';
+
+export interface FavorCondition {
+  id?: number;
+  name: string;
+  query: string;
+  description: string;
+  enabled: boolean;
+  priority: number;
+  max_results: number;
+  filter_hot_sector: boolean;
+  filter_min_cap_yi?: number;
+}
+
+export interface WatchlistItem {
+  code: string;
+  name: string;
+  account_id: string;
+  group_name: string;
+  source_condition: string;
+  signal_type: string;
+  confidence: number;
+  added_at: string;
+}
+
+export interface PickRequest {
+  condition_names?: string[];
+  clear_existing?: boolean;
+  account_id?: string;
+}
+
+export interface PickResponse {
+  success: boolean;
+  message: string;
+  total_unique: number;
+  added: number;
+  existing: number;
+  codes: string[];
+}
+
+export const favorApi = {
+  pick: (params: PickRequest) =>
+    apiClient.post<PickResponse>('/favor/pick', params).then(r => r.data),
+
+  getWatchlist: (account_id?: string, group_name?: string) =>
+    apiClient.get<{ items: WatchlistItem[] }>('/favor/watchlist', {
+      params: { account_id, group_name }
+    }).then(r => r.data),
+
+  addToWatchlist: (item: { code: string; name?: string; account_id?: string; group_name?: string; source_condition?: string }) =>
+    apiClient.post('/favor/watchlist', item).then(r => r.data),
+
+  removeFromWatchlist: (code: string, account_id?: string, group_name?: string) =>
+    apiClient.delete(`/favor/watchlist/${code}`, {
+      params: { account_id, group_name }
+    }).then(r => r.data),
+
+  listConditions: () =>
+    apiClient.get<{ conditions: FavorCondition[] }>('/favor/conditions').then(r => r.data),
+
+  saveCondition: (condition: FavorCondition) =>
+    apiClient.post('/favor/conditions', condition).then(r => r.data),
+
+  deleteCondition: (id: number) =>
+    apiClient.delete(`/favor/conditions/${id}`).then(r => r.data),
+};

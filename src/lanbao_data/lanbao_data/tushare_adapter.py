@@ -337,6 +337,48 @@ class TushareAdapter:
             logger.error(f"获取指数 {index_code} 数据失败: {e}")
             return pd.DataFrame()
     
+    def _get_financial_statement(self, symbol: str, period: str, api_method: str, statement_name: str) -> pd.DataFrame:
+        """
+        通用财务报表获取
+
+        Args:
+            symbol: 股票代码
+            period: 报告期
+            api_method: Tushare API 方法名 ('balancesheet', 'income', 'cashflow')
+            statement_name: 报表名称（用于日志）
+
+        Returns:
+            DataFrame
+        """
+        try:
+            self._rate_limit(financial=True)
+            ts_code = self._convert_symbol(symbol)
+
+            df = getattr(self._pro, api_method)(ts_code=ts_code, period=period)
+
+            if df is None or df.empty:
+                logger.warning(f"未获取到 {symbol} 的{statement_name}: {period}")
+                return pd.DataFrame()
+
+            logger.debug(f"获取 {symbol} {statement_name}: {period}, {len(df)} 条")
+            return df
+
+        except Exception as e:
+            logger.error(f"获取 {symbol} {statement_name}失败 ({period}): {e}")
+            return pd.DataFrame()
+
+    def get_balance_sheet(self, symbol: str, period: str) -> pd.DataFrame:
+        """获取资产负债表"""
+        return self._get_financial_statement(symbol, period, 'balancesheet', '资产负债表')
+
+    def get_income_statement(self, symbol: str, period: str) -> pd.DataFrame:
+        """获取利润表"""
+        return self._get_financial_statement(symbol, period, 'income', '利润表')
+
+    def get_cashflow_statement(self, symbol: str, period: str) -> pd.DataFrame:
+        """获取现金流量表"""
+        return self._get_financial_statement(symbol, period, 'cashflow', '现金流量表')
+
     def _convert_symbol(self, symbol: str) -> str:
         """
         转换股票代码格式
@@ -355,45 +397,3 @@ class TushareAdapter:
             return f"{symbol}.SH"
         else:
             return f"{symbol}.SZ"
-
-    def get_balance_sheet(self, symbol: str, period: str) -> pd.DataFrame:
-        try:
-            self._rate_limit(financial=True)
-            ts_code = self._convert_symbol(symbol)
-            df = self._pro.balancesheet(ts_code=ts_code, period=period)
-            if df is None or df.empty:
-                logger.warning(f"未获取到 {symbol} 的资产负债表: {period}")
-                return pd.DataFrame()
-            logger.debug(f"获取 {symbol} 资产负债表: {period}, {len(df)} 条")
-            return df
-        except Exception as e:
-            logger.error(f"获取 {symbol} 资产负债表失败 ({period}): {e}")
-            return pd.DataFrame()
-
-    def get_income_statement(self, symbol: str, period: str) -> pd.DataFrame:
-        try:
-            self._rate_limit(financial=True)
-            ts_code = self._convert_symbol(symbol)
-            df = self._pro.income(ts_code=ts_code, period=period)
-            if df is None or df.empty:
-                logger.warning(f"未获取到 {symbol} 的利润表: {period}")
-                return pd.DataFrame()
-            logger.debug(f"获取 {symbol} 利润表: {period}, {len(df)} 条")
-            return df
-        except Exception as e:
-            logger.error(f"获取 {symbol} 利润表失败 ({period}): {e}")
-            return pd.DataFrame()
-
-    def get_cashflow_statement(self, symbol: str, period: str) -> pd.DataFrame:
-        try:
-            self._rate_limit(financial=True)
-            ts_code = self._convert_symbol(symbol)
-            df = self._pro.cashflow(ts_code=ts_code, period=period)
-            if df is None or df.empty:
-                logger.warning(f"未获取到 {symbol} 的现金流量表: {period}")
-                return pd.DataFrame()
-            logger.debug(f"获取 {symbol} 现金流量表: {period}, {len(df)} 条")
-            return df
-        except Exception as e:
-            logger.error(f"获取 {symbol} 现金流量表失败 ({period}): {e}")
-            return pd.DataFrame()

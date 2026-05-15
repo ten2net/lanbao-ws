@@ -40,15 +40,15 @@ class DataSyncNode(LanBaoBaseNode):
     """
 
     def __init__(self, config: Optional[NodeConfig] = None):
-        super().__init__('data_sync_node', config)
+        super().__init__("data_sync_node", config)
 
         self._adapter: Optional[TushareAdapter] = None
         self._storage: Optional[DuckDBStorage] = None
 
         # 配置
         self._sync_enabled = True
-        self._sync_start_date = '20200101'
-        self._schedule_time = '17:00'
+        self._sync_start_date = "20200101"
+        self._schedule_time = "17:00"
         self._run_on_startup = False
         self._batch_report_interval = 100
         self._max_workers = 1  # Tushare 100ms间隔，单线程约10 QPS
@@ -64,9 +64,9 @@ class DataSyncNode(LanBaoBaseNode):
 
         # 财务同步配置
         self._financial_sync_enabled = True
-        self._financial_sync_day = 'sun'
-        self._financial_sync_time = '02:00'
-        self._financial_start_period = '20200101'
+        self._financial_sync_day = "sun"
+        self._financial_sync_time = "02:00"
+        self._financial_start_period = "20200101"
         self._financial_run_on_startup = False
         self._financial_batch_interval = 100
 
@@ -92,19 +92,23 @@ class DataSyncNode(LanBaoBaseNode):
             self._adapter = TushareAdapter()
 
             # 注册健康检查
-            self._health.register_check('tushare_connection', self._check_tushare, interval_seconds=60)
-            self._health.register_check('storage_connection', self._check_storage_available, interval_seconds=60)
+            self._health.register_check(
+                "tushare_connection", self._check_tushare, interval_seconds=60
+            )
+            self._health.register_check(
+                "storage_connection", self._check_storage_available, interval_seconds=60
+            )
 
             # 创建研究报告相关服务
             self._save_research_report_service = self.create_service(
                 SaveResearchReport,
-                '/data_sync/save_research_report',
-                self._handle_save_research_report
+                "/data_sync/save_research_report",
+                self._handle_save_research_report,
             )
             self._get_research_report_service = self.create_service(
                 GetResearchReport,
-                '/data_sync/get_research_report',
-                self._handle_get_research_report
+                "/data_sync/get_research_report",
+                self._handle_get_research_report,
             )
 
             logger.info("DataSyncNode 资源初始化完成（无持久数据库连接）")
@@ -123,17 +127,12 @@ class DataSyncNode(LanBaoBaseNode):
 
             # 创建定时器，每分钟检查是否到达同步时间
             self._schedule_timer = self.create_timer(
-                60.0,
-                self._on_schedule_check,
-                callback_group=self._callback_group
+                60.0, self._on_schedule_check, callback_group=self._callback_group
             )
 
             # 创建手动同步触发订阅
             self._sync_trigger_sub = self.create_subscription(
-                StdString,
-                '/data/trigger_sync',
-                self._on_sync_trigger,
-                10
+                StdString, "/data/trigger_sync", self._on_sync_trigger, 10
             )
             logger.info("已注册手动同步触发订阅: /data/trigger_sync")
 
@@ -151,18 +150,13 @@ class DataSyncNode(LanBaoBaseNode):
 
             # 注册财务同步手动触发订阅
             self._financial_sync_trigger_sub = self.create_subscription(
-                StdString,
-                '/data/trigger_financial_sync',
-                self._on_financial_sync_trigger,
-                10
+                StdString, "/data/trigger_financial_sync", self._on_financial_sync_trigger, 10
             )
             logger.info("已注册财务同步手动触发订阅: /data/trigger_financial_sync")
 
             # 创建财务同步定时器（每分钟检查）
             self._financial_schedule_timer = self.create_timer(
-                60.0,
-                self._on_financial_schedule_check,
-                callback_group=self._callback_group
+                60.0, self._on_financial_schedule_check, callback_group=self._callback_group
             )
 
             # 启动时执行一次财务同步（如果配置启用）
@@ -171,10 +165,14 @@ class DataSyncNode(LanBaoBaseNode):
                 self._trigger_financial_sync()
             else:
                 if self._should_sync_financial_today():
-                    logger.info(f"今天符合财务同步条件 ({self._financial_sync_day} {self._financial_sync_time})，立即补同步")
+                    logger.info(
+                        f"今天符合财务同步条件 ({self._financial_sync_day} {self._financial_sync_time})，立即补同步"
+                    )
                     self._trigger_financial_sync()
                 else:
-                    logger.info(f"财务同步已配置，将在每周 {self._financial_sync_day} {self._financial_sync_time} 执行")
+                    logger.info(
+                        f"财务同步已配置，将在每周 {self._financial_sync_day} {self._financial_sync_time} 执行"
+                    )
 
             return True
 
@@ -206,9 +204,9 @@ class DataSyncNode(LanBaoBaseNode):
                 self.destroy_timer(self._financial_schedule_timer)
 
             # Destroy subscriptions
-            if hasattr(self, '_sync_trigger_sub') and self._sync_trigger_sub:
+            if hasattr(self, "_sync_trigger_sub") and self._sync_trigger_sub:
                 self.destroy_subscription(self._sync_trigger_sub)
-            if hasattr(self, '_financial_sync_trigger_sub') and self._financial_sync_trigger_sub:
+            if hasattr(self, "_financial_sync_trigger_sub") and self._financial_sync_trigger_sub:
                 self.destroy_subscription(self._financial_sync_trigger_sub)
 
             logger.info("DataSyncNode 已停止")
@@ -218,35 +216,39 @@ class DataSyncNode(LanBaoBaseNode):
 
     def _load_config(self):
         """加载同步配置"""
-        config_path = os.getenv('LANBAO_CONFIG', 'config/lanbao.yaml')
+        config_path = os.getenv("LANBAO_CONFIG", "config/lanbao.yaml")
 
         if os.path.exists(config_path):
             try:
-                with open(config_path, 'r', encoding='utf-8') as f:
+                with open(config_path, "r", encoding="utf-8") as f:
                     config = yaml.safe_load(f)
 
-                sync_config = config.get('data_sync', {})
-                self._sync_enabled = sync_config.get('enabled', True)
-                self._sync_start_date = sync_config.get('start_date', '20200101')
-                self._schedule_time = sync_config.get('schedule_time', '17:00')
-                self._run_on_startup = sync_config.get('run_on_startup', False)
-                self._batch_report_interval = sync_config.get('batch_report_interval', 100)
-                self._max_workers = sync_config.get('max_workers', 1)
+                sync_config = config.get("data_sync", {})
+                self._sync_enabled = sync_config.get("enabled", True)
+                self._sync_start_date = sync_config.get("start_date", "20200101")
+                self._schedule_time = sync_config.get("schedule_time", "17:00")
+                self._run_on_startup = sync_config.get("run_on_startup", False)
+                self._batch_report_interval = sync_config.get("batch_report_interval", 100)
+                self._max_workers = sync_config.get("max_workers", 1)
 
-                logger.info(f"加载同步配置: start_date={self._sync_start_date}, "
-                           f"schedule={self._schedule_time}, enabled={self._sync_enabled}")
+                logger.info(
+                    f"加载同步配置: start_date={self._sync_start_date}, "
+                    f"schedule={self._schedule_time}, enabled={self._sync_enabled}"
+                )
 
                 # 加载财务同步配置
-                financial_config = config.get('data_sync', {}).get('financial_sync', {})
-                self._financial_sync_enabled = financial_config.get('enabled', True)
-                self._financial_sync_day = financial_config.get('sync_day', 'sun')
-                self._financial_sync_time = financial_config.get('sync_time', '02:00')
-                self._financial_start_period = financial_config.get('start_period', '20200101')
-                self._financial_run_on_startup = financial_config.get('run_on_startup', False)
-                self._financial_batch_interval = financial_config.get('batch_report_interval', 100)
+                financial_config = config.get("data_sync", {}).get("financial_sync", {})
+                self._financial_sync_enabled = financial_config.get("enabled", True)
+                self._financial_sync_day = financial_config.get("sync_day", "sun")
+                self._financial_sync_time = financial_config.get("sync_time", "02:00")
+                self._financial_start_period = financial_config.get("start_period", "20200101")
+                self._financial_run_on_startup = financial_config.get("run_on_startup", False)
+                self._financial_batch_interval = financial_config.get("batch_report_interval", 100)
 
-                logger.info(f"加载财务同步配置: enabled={self._financial_sync_enabled}, "
-                           f"day={self._financial_sync_day}, time={self._financial_sync_time}")
+                logger.info(
+                    f"加载财务同步配置: enabled={self._financial_sync_enabled}, "
+                    f"day={self._financial_sync_day}, time={self._financial_sync_time}"
+                )
 
             except Exception as e:
                 logger.warning(f"加载配置文件失败，使用默认配置: {e}")
@@ -263,14 +265,19 @@ class DataSyncNode(LanBaoBaseNode):
                 return False
 
         now = datetime.now()
-        current_time = now.strftime('%H:%M')
-        current_weekday = now.strftime('%a').lower()
+        current_time = now.strftime("%H:%M")
+        current_weekday = now.strftime("%a").lower()
 
         day_map = {
-            'mon': 'mon', 'tue': 'tue', 'wed': 'wed',
-            'thu': 'thu', 'fri': 'fri', 'sat': 'sat', 'sun': 'sun'
+            "mon": "mon",
+            "tue": "tue",
+            "wed": "wed",
+            "thu": "thu",
+            "fri": "fri",
+            "sat": "sat",
+            "sun": "sun",
         }
-        target_day = day_map.get(self._financial_sync_day.lower(), 'sun')
+        target_day = day_map.get(self._financial_sync_day.lower(), "sun")
         if current_weekday != target_day:
             return False
 
@@ -307,10 +314,7 @@ class DataSyncNode(LanBaoBaseNode):
 
         self._last_financial_sync_time = datetime.now()
 
-        self._financial_sync_thread = threading.Thread(
-            target=self._sync_financial_job,
-            daemon=True
-        )
+        self._financial_sync_thread = threading.Thread(target=self._sync_financial_job, daemon=True)
         self._financial_sync_thread.start()
         logger.info("财务同步后台任务已启动")
 
@@ -320,7 +324,7 @@ class DataSyncNode(LanBaoBaseNode):
             return False
 
         now = datetime.now()
-        current_time = now.strftime('%H:%M')
+        current_time = now.strftime("%H:%M")
 
         # 当前时间是否已过同步时间
         if current_time < self._schedule_time:
@@ -341,7 +345,7 @@ class DataSyncNode(LanBaoBaseNode):
             return
 
         now = datetime.now()
-        current_time = now.strftime('%H:%M')
+        current_time = now.strftime("%H:%M")
 
         # 检查是否到达设定的同步时间，或已过同步时间但今天未同步
         if current_time >= self._schedule_time:
@@ -386,7 +390,7 @@ class DataSyncNode(LanBaoBaseNode):
             self._status.status = "SYNCING_FINANCIAL"
 
             logger.info("正在获取A股股票列表（财务同步）...")
-            stock_list = self._adapter.get_stock_list(market='A')
+            stock_list = self._adapter.get_stock_list(market="A")
 
             if stock_list.empty:
                 logger.error("获取股票列表失败，财务同步终止")
@@ -404,7 +408,7 @@ class DataSyncNode(LanBaoBaseNode):
                 return
 
             logger.info("正在获取数据库写入权限（财务同步）...")
-            db_path = os.getenv('DUCKDB_PATH', './data/lanbao.duckdb')
+            db_path = os.getenv("DUCKDB_PATH", "./data/lanbao.duckdb")
 
             if self._storage:
                 self._storage.close()
@@ -426,8 +430,8 @@ class DataSyncNode(LanBaoBaseNode):
                 raise RuntimeError("无法获取数据库写入权限")
 
             for i, task in enumerate(sync_tasks):
-                symbol = task['symbol']
-                period = task['period']
+                symbol = task["symbol"]
+                period = task["period"]
 
                 try:
                     bs_data = self._adapter.get_balance_sheet(symbol, period=period)
@@ -449,24 +453,30 @@ class DataSyncNode(LanBaoBaseNode):
                         success_count += 1
                     else:
                         failed_count += 1
-                        logger.warning(f"[{i+1}/{len(sync_tasks)}] {symbol} {period}: 部分报表缺失 ({saved}/3)")
+                        logger.warning(
+                            f"[{i+1}/{len(sync_tasks)}] {symbol} {period}: 部分报表缺失 ({saved}/3)"
+                        )
 
                     if (i + 1) % self._financial_batch_interval == 0:
                         progress = (i + 1) / len(sync_tasks) * 100
                         elapsed = time.time() - start_time
                         rate = (i + 1) / elapsed if elapsed > 0 else 0
                         remaining = (len(sync_tasks) - (i + 1)) / rate if rate > 0 else 0
-                        logger.info(f"财务同步进度: {i+1}/{len(sync_tasks)} ({progress:.1f}%), "
-                                   f"成功 {success_count}, 失败 {failed_count}, "
-                                   f"预计剩余 {remaining/60:.0f}分钟")
+                        logger.info(
+                            f"财务同步进度: {i+1}/{len(sync_tasks)} ({progress:.1f}%), "
+                            f"成功 {success_count}, 失败 {failed_count}, "
+                            f"预计剩余 {remaining/60:.0f}分钟"
+                        )
 
                 except Exception as e:
                     logger.error(f"[{i+1}/{len(sync_tasks)}] {symbol} {period}: 同步失败 - {e}")
                     failed_count += 1
 
             elapsed = time.time() - start_time
-            message = (f"财务同步完成: 成功 {success_count}/{len(sync_tasks)}, "
-                      f"失败 {failed_count}, 耗时 {elapsed:.1f}秒")
+            message = (
+                f"财务同步完成: 成功 {success_count}/{len(sync_tasks)}, "
+                f"失败 {failed_count}, 耗时 {elapsed:.1f}秒"
+            )
             logger.info(message)
             self._publish_alert("INFO", message, component="data_sync_financial")
 
@@ -483,11 +493,11 @@ class DataSyncNode(LanBaoBaseNode):
             with self._financial_sync_lock:
                 self._financial_sync_running = False
             self._financial_sync_stats = {
-                'total': total_symbols,
-                'synced': success_count,
-                'failed': failed_count,
-                'elapsed': time.time() - start_time,
-                'last_sync': datetime.now().isoformat()
+                "total": total_symbols,
+                "synced": success_count,
+                "failed": failed_count,
+                "elapsed": time.time() - start_time,
+                "last_sync": datetime.now().isoformat(),
             }
             self._status.status = "RUNNING"
 
@@ -507,7 +517,7 @@ class DataSyncNode(LanBaoBaseNode):
 
             # 步骤1: 获取全部A股列表（只读模式即可）
             logger.info("正在获取A股股票列表...")
-            stock_list = self._adapter.get_stock_list(market='A')
+            stock_list = self._adapter.get_stock_list(market="A")
 
             if stock_list.empty:
                 logger.error("获取股票列表失败，同步终止")
@@ -527,7 +537,7 @@ class DataSyncNode(LanBaoBaseNode):
 
             # 步骤3: 关闭只读连接，获取写入连接
             logger.info("正在获取数据库写入权限...")
-            db_path = os.getenv('DUCKDB_PATH', './data/lanbao.duckdb')
+            db_path = os.getenv("DUCKDB_PATH", "./data/lanbao.duckdb")
 
             # 关闭只读连接
             if self._storage:
@@ -561,9 +571,9 @@ class DataSyncNode(LanBaoBaseNode):
 
             # 步骤5: 执行批量下载和写入
             write_storage.update_sync_status(
-                status='running',
+                status="running",
                 total_symbols=total_symbols,
-                message=f'开始下载数据，共 {len(sync_tasks)} 只需同步'
+                message=f"开始下载数据，共 {len(sync_tasks)} 只需同步",
             )
 
             if self._max_workers > 1:
@@ -572,16 +582,18 @@ class DataSyncNode(LanBaoBaseNode):
                 success_count, failed_count = self._download_sequential(sync_tasks, write_storage)
 
             elapsed = time.time() - start_time
-            message = (f"同步完成: 成功 {success_count}/{len(sync_tasks)}, "
-                      f"失败 {failed_count}, 耗时 {elapsed:.1f}秒")
+            message = (
+                f"同步完成: 成功 {success_count}/{len(sync_tasks)}, "
+                f"失败 {failed_count}, 耗时 {elapsed:.1f}秒"
+            )
             logger.info(message)
 
             write_storage.update_sync_status(
-                status='completed',
+                status="completed",
                 total_symbols=total_symbols,
                 success_count=success_count,
                 failed_count=failed_count,
-                message=message
+                message=message,
             )
 
             self._publish_alert("INFO", message, component="data_sync")
@@ -593,11 +605,11 @@ class DataSyncNode(LanBaoBaseNode):
 
             if write_storage:
                 write_storage.update_sync_status(
-                    status='failed',
+                    status="failed",
                     total_symbols=total_symbols,
                     success_count=success_count,
                     failed_count=failed_count,
-                    message=message
+                    message=message,
                 )
 
             self._publish_alert("ERROR", message, component="data_sync")
@@ -609,18 +621,18 @@ class DataSyncNode(LanBaoBaseNode):
 
             self._sync_running = False
             self._sync_stats = {
-                'total': total_symbols,
-                'synced': success_count,
-                'failed': failed_count,
-                'elapsed': time.time() - start_time,
-                'last_sync': datetime.now().isoformat()
+                "total": total_symbols,
+                "synced": success_count,
+                "failed": failed_count,
+                "elapsed": time.time() - start_time,
+                "last_sync": datetime.now().isoformat(),
             }
             self._status.status = "RUNNING"
 
     def _update_trade_calendar(self, storage: DuckDBStorage):
         """更新交易日历（2020年至今）"""
         try:
-            end_date = datetime.now().strftime('%Y%m%d')
+            end_date = datetime.now().strftime("%Y%m%d")
             start_date = self._sync_start_date
 
             # 先从数据库查询已有的交易日历
@@ -651,65 +663,71 @@ class DataSyncNode(LanBaoBaseNode):
         （临时创建只读连接，查询后立即关闭，避免与写入进程冲突）
         """
         tasks = []
-        end_date = datetime.now().strftime('%Y%m%d')
+        end_date = datetime.now().strftime("%Y%m%d")
         read_storage = None
 
         try:
-            db_path = os.getenv('DUCKDB_PATH', './data/lanbao.duckdb')
+            db_path = os.getenv("DUCKDB_PATH", "./data/lanbao.duckdb")
             read_storage = DuckDBStorage(db_path, read_only=True)
 
             # 批量查询所有股票的数据范围
             db_range = read_storage.get_symbols_with_date_range()
             db_map = {}
             if not db_range.empty:
-                db_map = dict(zip(db_range['symbol'], db_range['max_date']))
+                db_map = dict(zip(db_range["symbol"], db_range["max_date"]))
 
             for _, row in stock_list.iterrows():
-                symbol = row['symbol']
+                symbol = row["symbol"]
 
                 # 查询数据库最新日期
                 max_date = db_map.get(symbol)
 
                 if max_date is None:
                     # 全新股票，全量下载
-                    tasks.append({
-                        'symbol': symbol,
-                        'start_date': self._sync_start_date,
-                        'end_date': end_date,
-                        'missing_days': 'all'
-                    })
+                    tasks.append(
+                        {
+                            "symbol": symbol,
+                            "start_date": self._sync_start_date,
+                            "end_date": end_date,
+                            "missing_days": "all",
+                        }
+                    )
                 else:
                     # 已有数据，计算增量
                     if isinstance(max_date, str):
-                        max_date = datetime.strptime(max_date, '%Y-%m-%d').date()
-                    elif hasattr(max_date, 'date'):
-                        max_date = max_date.date() if hasattr(max_date, 'date') else max_date
+                        max_date = datetime.strptime(max_date, "%Y-%m-%d").date()
+                    elif hasattr(max_date, "date"):
+                        max_date = max_date.date() if hasattr(max_date, "date") else max_date
 
                     # 计算下一个交易日
                     next_date = max_date + timedelta(days=1)
-                    next_date_str = next_date.strftime('%Y%m%d')
+                    next_date_str = next_date.strftime("%Y%m%d")
 
                     # 查询需要补充的交易日
                     trade_dates = read_storage.get_trade_calendar(next_date_str, end_date)
 
                     if trade_dates:
-                        tasks.append({
-                            'symbol': symbol,
-                            'start_date': next_date_str,
-                            'end_date': end_date,
-                            'missing_days': len(trade_dates)
-                        })
+                        tasks.append(
+                            {
+                                "symbol": symbol,
+                                "start_date": next_date_str,
+                                "end_date": end_date,
+                                "missing_days": len(trade_dates),
+                            }
+                        )
 
         except Exception as e:
             logger.error(f"构建同步任务失败: {e}")
             # 如果无法读取数据库，假设所有股票都需要全量同步
             for _, row in stock_list.iterrows():
-                tasks.append({
-                    'symbol': row['symbol'],
-                    'start_date': self._sync_start_date,
-                    'end_date': end_date,
-                    'missing_days': 'all (fallback)'
-                })
+                tasks.append(
+                    {
+                        "symbol": row["symbol"],
+                        "start_date": self._sync_start_date,
+                        "end_date": end_date,
+                        "missing_days": "all (fallback)",
+                    }
+                )
 
         finally:
             if read_storage:
@@ -736,7 +754,7 @@ class DataSyncNode(LanBaoBaseNode):
             for month, day in [(3, 31), (6, 30), (9, 30), (12, 31)]:
                 period_date = datetime(year, month, day)
                 if period_date <= current_date:
-                    periods.append(period_date.strftime('%Y%m%d'))
+                    periods.append(period_date.strftime("%Y%m%d"))
 
         return periods
 
@@ -758,7 +776,7 @@ class DataSyncNode(LanBaoBaseNode):
         existing: Dict[str, set] = {}
 
         try:
-            db_path = os.getenv('DUCKDB_PATH', './data/lanbao.duckdb')
+            db_path = os.getenv("DUCKDB_PATH", "./data/lanbao.duckdb")
             read_storage = DuckDBStorage(db_path, read_only=True)
             existing = read_storage.get_existing_financial_periods()
         except Exception as e:
@@ -769,16 +787,15 @@ class DataSyncNode(LanBaoBaseNode):
 
         tasks = []
         for _, row in stock_list.iterrows():
-            symbol = row['symbol']
+            symbol = row["symbol"]
             symbol_existing = existing.get(symbol, set())
             for period in periods:
                 if period not in symbol_existing:
-                    tasks.append({
-                        'symbol': symbol,
-                        'period': period
-                    })
+                    tasks.append({"symbol": symbol, "period": period})
 
-        logger.info(f"财务同步任务: 共 {len(tasks)} 个 (股票 {len(stock_list)} 只, 报告期 {len(periods)} 个)")
+        logger.info(
+            f"财务同步任务: 共 {len(tasks)} 个 (股票 {len(stock_list)} 只, 报告期 {len(periods)} 个)"
+        )
         return tasks
 
     def _download_sequential(self, tasks: List[Dict[str, Any]], storage: DuckDBStorage) -> tuple:
@@ -787,9 +804,9 @@ class DataSyncNode(LanBaoBaseNode):
         failed = 0
 
         for i, task in enumerate(tasks):
-            symbol = task['symbol']
-            start_date = task['start_date']
-            end_date = task['end_date']
+            symbol = task["symbol"]
+            start_date = task["start_date"]
+            end_date = task["end_date"]
 
             try:
                 # 下载数据
@@ -809,13 +826,15 @@ class DataSyncNode(LanBaoBaseNode):
                 # 定期报告进度
                 if (i + 1) % self._batch_report_interval == 0:
                     progress = (i + 1) / len(tasks) * 100
-                    logger.info(f"同步进度: {i+1}/{len(tasks)} ({progress:.1f}%)，"
-                               f"成功 {success}，失败 {failed}")
+                    logger.info(
+                        f"同步进度: {i+1}/{len(tasks)} ({progress:.1f}%)，"
+                        f"成功 {success}，失败 {failed}"
+                    )
                     storage.update_sync_status(
-                        status='running',
+                        status="running",
                         success_count=success,
                         failed_count=failed,
-                        message=f'进度 {progress:.1f}%'
+                        message=f"进度 {progress:.1f}%",
                     )
 
             except Exception as e:
@@ -833,9 +852,9 @@ class DataSyncNode(LanBaoBaseNode):
 
         def download_task(task: Dict[str, Any]) -> bool:
             nonlocal success, failed, completed
-            symbol = task['symbol']
-            start_date = task['start_date']
-            end_date = task['end_date']
+            symbol = task["symbol"]
+            start_date = task["start_date"]
+            end_date = task["end_date"]
 
             try:
                 data = self._adapter.get_daily_data(symbol, start_date, end_date)
@@ -873,32 +892,34 @@ class DataSyncNode(LanBaoBaseNode):
                 if completed % self._batch_report_interval == 0:
                     with lock:
                         progress = completed / len(tasks) * 100
-                        logger.info(f"同步进度: {completed}/{len(tasks)} ({progress:.1f}%)，"
-                                   f"成功 {success}，失败 {failed}")
+                        logger.info(
+                            f"同步进度: {completed}/{len(tasks)} ({progress:.1f}%)，"
+                            f"成功 {success}，失败 {failed}"
+                        )
 
         return success, failed
 
     def _check_tushare(self) -> Dict[str, Any]:
         """健康检查：Tushare连接"""
         if self._adapter and self._adapter.is_available():
-            return {'status': 'HEALTHY', 'message': 'Tushare连接正常'}
-        return {'status': 'UNHEALTHY', 'message': 'Tushare连接异常'}
+            return {"status": "HEALTHY", "message": "Tushare连接正常"}
+        return {"status": "UNHEALTHY", "message": "Tushare连接异常"}
 
     def _check_storage_available(self) -> Dict[str, Any]:
         """健康检查：存储是否可用（检查数据库文件是否存在，不建立连接）"""
         try:
-            db_path = os.getenv('DUCKDB_PATH', './data/lanbao.duckdb')
+            db_path = os.getenv("DUCKDB_PATH", "./data/lanbao.duckdb")
             if os.path.exists(db_path):
-                return {'status': 'HEALTHY', 'message': 'DuckDB数据库文件存在'}
-            return {'status': 'DEGRADED', 'message': 'DuckDB数据库文件不存在，首次同步将创建'}
+                return {"status": "HEALTHY", "message": "DuckDB数据库文件存在"}
+            return {"status": "DEGRADED", "message": "DuckDB数据库文件不存在，首次同步将创建"}
         except Exception as e:
-            return {'status': 'UNHEALTHY', 'message': f'检查存储失败: {e}'}
+            return {"status": "UNHEALTHY", "message": f"检查存储失败: {e}"}
 
     def _handle_save_research_report(self, request, response):
         """处理保存研究报告请求"""
         storage = None
         try:
-            db_path = os.getenv('DUCKDB_PATH', './data/lanbao.duckdb')
+            db_path = os.getenv("DUCKDB_PATH", "./data/lanbao.duckdb")
             storage = DuckDBStorage(db_path, read_only=False)
 
             success = storage.save_research_report(
@@ -908,7 +929,7 @@ class DataSyncNode(LanBaoBaseNode):
                 summary=request.summary,
                 verdict=request.verdict,
                 confidence=request.confidence,
-                report_json=request.report_json
+                report_json=request.report_json,
             )
 
             response.success = success
@@ -927,28 +948,28 @@ class DataSyncNode(LanBaoBaseNode):
         """处理获取研究报告请求"""
         storage = None
         try:
-            db_path = os.getenv('DUCKDB_PATH', './data/lanbao.duckdb')
+            db_path = os.getenv("DUCKDB_PATH", "./data/lanbao.duckdb")
             storage = DuckDBStorage(db_path, read_only=True)
 
             report = storage.get_research_report(request.report_id)
 
             if report:
                 response.found = True
-                response.report_json = report.get('report_json', '')
-                created_at = report.get('created_at')
-                if created_at and hasattr(created_at, 'strftime'):
-                    response.created_at = created_at.strftime('%Y-%m-%d %H:%M:%S')
+                response.report_json = report.get("report_json", "")
+                created_at = report.get("created_at")
+                if created_at and hasattr(created_at, "strftime"):
+                    response.created_at = created_at.strftime("%Y-%m-%d %H:%M:%S")
                 else:
-                    response.created_at = str(created_at) if created_at else ''
+                    response.created_at = str(created_at) if created_at else ""
             else:
                 response.found = False
-                response.report_json = ''
-                response.created_at = ''
+                response.report_json = ""
+                response.created_at = ""
         except Exception as e:
             logger.error(f"获取研究报告服务出错: {e}")
             response.found = False
-            response.report_json = ''
-            response.created_at = ''
+            response.report_json = ""
+            response.created_at = ""
         finally:
             if storage:
                 storage.close()
@@ -959,6 +980,7 @@ class DataSyncNode(LanBaoBaseNode):
 def main(args=None):
     """节点入口"""
     import rclpy
+
     rclpy.init(args=args)
 
     node = DataSyncNode()
@@ -971,5 +993,5 @@ def main(args=None):
         rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

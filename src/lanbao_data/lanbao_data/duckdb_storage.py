@@ -2,6 +2,7 @@
 DuckDB数据存储模块
 提供高性能的本地数据存储和查询
 """
+
 import os
 import time
 import json
@@ -26,9 +27,11 @@ class DuckDBStorage:
     - 数据缓存
     """
 
-    _ALLOWED_FINANCIAL_TABLES = {'balance_sheet', 'income_statement', 'cashflow_statement'}
-    
-    def __init__(self, db_path: str = "./data/lanbao.duckdb", read_only: bool = False, timeout: int = 30):
+    _ALLOWED_FINANCIAL_TABLES = {"balance_sheet", "income_statement", "cashflow_statement"}
+
+    def __init__(
+        self, db_path: str = "./data/lanbao.duckdb", read_only: bool = False, timeout: int = 30
+    ):
         """
         初始化DuckDB存储
 
@@ -55,7 +58,7 @@ class DuckDBStorage:
             self._init_tables()
 
         logger.info(f"DuckDB存储初始化完成: {db_path} (read_only={read_only})")
-    
+
     def _acquire_file_lock(self, timeout: int):
         """获取操作系统文件锁（共享或排他）"""
         import fcntl
@@ -96,16 +99,16 @@ class DuckDBStorage:
     def _connect_with_retry(self, timeout: int) -> duckdb.DuckDBPyConnection:
         """
         带重试的连接
-        
+
         Args:
             timeout: 超时时间（秒）
-            
+
         Returns:
             DuckDB连接对象
         """
         start_time = time.time()
         last_error = None
-        
+
         while time.time() - start_time < timeout:
             try:
                 # 尝试连接
@@ -114,7 +117,7 @@ class DuckDBStorage:
             except Exception as e:
                 last_error = e
                 error_msg = str(e).lower()
-                
+
                 # 如果是锁冲突，等待后重试
                 if "lock" in error_msg or "busy" in error_msg or "conflicting" in error_msg:
                     logger.warning(f"数据库被锁定，等待重试... ({e})")
@@ -123,11 +126,11 @@ class DuckDBStorage:
                 else:
                     # 其他错误直接抛出
                     raise
-        
+
         # 超时后抛出最后一次错误
         logger.error(f"连接数据库超时: {last_error}")
         raise last_error
-    
+
     def _init_tables(self):
         """初始化数据表"""
         # 股票日线数据表（含前复权价格）
@@ -152,7 +155,7 @@ class DuckDBStorage:
                 PRIMARY KEY (symbol, date)
             )
         """)
-        
+
         # 股票基本信息表
         self._conn.execute("""
             CREATE TABLE IF NOT EXISTS stock_info (
@@ -164,7 +167,7 @@ class DuckDBStorage:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
+
         # 回测结果表
         self._conn.execute("""
             CREATE TABLE IF NOT EXISTS backtest_results (
@@ -184,7 +187,7 @@ class DuckDBStorage:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
+
         # 交易记录表
         self._conn.execute("""
             CREATE TABLE IF NOT EXISTS trades (
@@ -201,12 +204,16 @@ class DuckDBStorage:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
+
         # 创建索引
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_daily_symbol ON stock_daily(symbol)")
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_stock_daily_symbol ON stock_daily(symbol)"
+        )
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_daily_date ON stock_daily(date)")
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_backtest_strategy ON backtest_results(strategy_id)")
-        
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_backtest_strategy ON backtest_results(strategy_id)"
+        )
+
         # 交易日历表
         self._conn.execute("""
             CREATE TABLE IF NOT EXISTS trade_calendar (
@@ -245,8 +252,12 @@ class DuckDBStorage:
             )
         """)
 
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_research_reports_type ON research_reports(report_type)")
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_research_reports_created ON research_reports(created_at DESC)")
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_research_reports_type ON research_reports(report_type)"
+        )
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_research_reports_created ON research_reports(created_at DESC)"
+        )
 
         # 资产负债表
         self._conn.execute("""
@@ -309,11 +320,11 @@ class DuckDBStorage:
 
             # 需要添加的新列
             new_columns = {
-                'adj_factor': 'DOUBLE DEFAULT 1.0',
-                'open_adj': 'DOUBLE',
-                'high_adj': 'DOUBLE',
-                'low_adj': 'DOUBLE',
-                'close_adj': 'DOUBLE'
+                "adj_factor": "DOUBLE DEFAULT 1.0",
+                "open_adj": "DOUBLE",
+                "high_adj": "DOUBLE",
+                "low_adj": "DOUBLE",
+                "close_adj": "DOUBLE",
             }
 
             for col, col_type in new_columns.items():
@@ -322,8 +333,8 @@ class DuckDBStorage:
                     logger.info(f"迁移: stock_daily 表添加列 {col}")
 
                     # 为已有数据填充默认值（原始价格作为前复权价格）
-                    if col != 'adj_factor':
-                        base_col = col.replace('_adj', '')
+                    if col != "adj_factor":
+                        base_col = col.replace("_adj", "")
                         self._conn.execute(f"""
                             UPDATE stock_daily
                             SET {col} = {base_col}
@@ -332,7 +343,7 @@ class DuckDBStorage:
 
         except Exception as e:
             logger.warning(f"表迁移失败（可能表不存在）: {e}")
-    
+
     def save_daily_data(self, symbol: str, data: pd.DataFrame) -> bool:
         """
         保存日线数据（支持前复权价格）
@@ -350,50 +361,60 @@ class DuckDBStorage:
 
             # 准备数据
             df = data.copy()
-            df['symbol'] = symbol
+            df["symbol"] = symbol
 
             # 列名映射：Tushare列名 -> 数据库列名
-            column_mapping = {
-                'pct_chg': 'change_pct',
-                'vol': 'volume'
-            }
+            column_mapping = {"pct_chg": "change_pct", "vol": "volume"}
             df = df.rename(columns=column_mapping)
 
             # 确保基本列存在
-            required_cols = ['symbol', 'date', 'open', 'high', 'low', 'close', 'volume']
+            required_cols = ["symbol", "date", "open", "high", "low", "close", "volume"]
             for col in required_cols:
                 if col not in df.columns:
                     logger.warning(f"数据缺少必要列: {col}")
                     return False
 
             # 添加数据源列（如果不存在）
-            if 'data_source' not in df.columns:
-                df['data_source'] = 'tushare'
+            if "data_source" not in df.columns:
+                df["data_source"] = "tushare"
 
             # 确保复权相关列存在（向后兼容）
-            for col in ['adj_factor', 'open_adj', 'high_adj', 'low_adj', 'close_adj']:
+            for col in ["adj_factor", "open_adj", "high_adj", "low_adj", "close_adj"]:
                 if col not in df.columns:
-                    if col == 'adj_factor':
+                    if col == "adj_factor":
                         df[col] = 1.0
                     else:
                         # *_adj 列默认等于原始价格
-                        base_col = col.replace('_adj', '')
+                        base_col = col.replace("_adj", "")
                         df[col] = df[base_col] if base_col in df.columns else 0.0
 
             # 删除已存在的数据(增量更新)
-            dates = df['date'].tolist()
+            dates = df["date"].tolist()
             if dates:
-                date_str = ','.join([f"'{d}'" for d in dates])
+                date_str = ",".join([f"'{d}'" for d in dates])
                 self._conn.execute(f"""
                     DELETE FROM stock_daily
                     WHERE symbol = '{symbol}' AND date IN ({date_str})
                 """)
 
             # 只保留数据库表需要的列，删除多余列避免映射错位
-            db_columns = ['symbol', 'date', 'open', 'high', 'low', 'close',
-                          'volume', 'amount', 'change_pct', 'adj_factor',
-                          'open_adj', 'high_adj', 'low_adj', 'close_adj',
-                          'data_source']
+            db_columns = [
+                "symbol",
+                "date",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "amount",
+                "change_pct",
+                "adj_factor",
+                "open_adj",
+                "high_adj",
+                "low_adj",
+                "close_adj",
+                "data_source",
+            ]
             df = df[[col for col in db_columns if col in df.columns]]
 
             # 插入数据（按列名匹配）
@@ -408,7 +429,7 @@ class DuckDBStorage:
         except Exception as e:
             logger.error(f"保存 {symbol} 数据失败: {e}")
             return False
-    
+
     def _normalize_date(self, date_str: Optional[str]) -> Optional[str]:
         """将日期格式统一为 YYYY-MM-DD，兼容 YYYYMMDD 格式"""
         if not date_str:
@@ -417,8 +438,9 @@ class DuckDBStorage:
             return f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}"
         return date_str
 
-    def get_daily_data(self, symbol: str, start_date: Optional[str] = None,
-                       end_date: Optional[str] = None) -> pd.DataFrame:
+    def get_daily_data(
+        self, symbol: str, start_date: Optional[str] = None, end_date: Optional[str] = None
+    ) -> pd.DataFrame:
         """
         获取日线数据
 
@@ -454,7 +476,7 @@ class DuckDBStorage:
         except Exception as e:
             logger.error(f"查询 {symbol} 数据失败: {e}")
             return pd.DataFrame()
-    
+
     def get_symbols(self) -> List[str]:
         """获取所有股票代码"""
         try:
@@ -465,29 +487,31 @@ class DuckDBStorage:
         except Exception as e:
             logger.error(f"获取股票列表失败: {e}")
             return []
-    
+
     def save_stock_info(self, data: pd.DataFrame) -> bool:
         """
         保存股票基本信息
-        
+
         Args:
             data: DataFrame包含股票信息
-            
+
         Returns:
             是否成功
         """
         try:
             if data.empty:
                 return False
-            
+
             df = data.copy()
 
             # 处理 list_date 格式转换（兼容 YYYYMMDD 字符串或整数）
-            if 'list_date' in df.columns:
-                df['list_date'] = pd.to_datetime(df['list_date'], format='%Y%m%d', errors='coerce').dt.date
+            if "list_date" in df.columns:
+                df["list_date"] = pd.to_datetime(
+                    df["list_date"], format="%Y%m%d", errors="coerce"
+                ).dt.date
 
             # 只保留需要的列，避免多余列导致映射问题
-            required_cols = ['symbol', 'name', 'industry', 'market', 'list_date']
+            required_cols = ["symbol", "name", "industry", "market", "list_date"]
             available_cols = [c for c in required_cols if c in df.columns]
             df = df[available_cols]
 
@@ -497,21 +521,21 @@ class DuckDBStorage:
                 SELECT symbol, name, industry, market, list_date, CURRENT_TIMESTAMP
                 FROM df
             """)
-            
+
             logger.info(f"保存股票信息: {len(df)} 条")
             return True
-            
+
         except Exception as e:
             logger.error(f"保存股票信息失败: {e}")
             return False
-    
+
     def save_backtest_result(self, result: Dict[str, Any]) -> bool:
         """
         保存回测结果
-        
+
         Args:
             result: 回测结果字典
-            
+
         Returns:
             是否成功
         """
@@ -533,47 +557,50 @@ class DuckDBStorage:
                     return json.dumps(value, ensure_ascii=False)
                 # 其他类型保持不变
                 return value
-            
+
             # 准备插入数据
-            params = result.get('params', {})
+            params = result.get("params", {})
             # 确保params是字典
             if not isinstance(params, dict):
                 params = {}
-            
-            self._conn.execute("""
+
+            self._conn.execute(
+                """
                 INSERT OR REPLACE INTO backtest_results VALUES (
                     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP
                 )
-            """, [
-                result['backtest_id'],
-                result.get('strategy_id', ''),
-                result.get('symbol', ''),
-                result.get('start_date'),
-                result.get('end_date'),
-                _convert_value(result.get('total_return', 0)),
-                _convert_value(result.get('annual_return', 0)),
-                _convert_value(result.get('sharpe_ratio', 0)),
-                _convert_value(result.get('max_drawdown', 0)),
-                _convert_value(result.get('volatility', 0)),
-                _convert_value(result.get('win_rate', 0)),
-                _convert_value(result.get('trades_count', 0)),
-                _convert_value(params)
-            ])
-            
+            """,
+                [
+                    result["backtest_id"],
+                    result.get("strategy_id", ""),
+                    result.get("symbol", ""),
+                    result.get("start_date"),
+                    result.get("end_date"),
+                    _convert_value(result.get("total_return", 0)),
+                    _convert_value(result.get("annual_return", 0)),
+                    _convert_value(result.get("sharpe_ratio", 0)),
+                    _convert_value(result.get("max_drawdown", 0)),
+                    _convert_value(result.get("volatility", 0)),
+                    _convert_value(result.get("win_rate", 0)),
+                    _convert_value(result.get("trades_count", 0)),
+                    _convert_value(params),
+                ],
+            )
+
             logger.info(f"保存回测结果: {result['backtest_id']}")
             return True
-            
+
         except Exception as e:
             logger.error(f"保存回测结果失败: {e}")
             return False
-    
+
     def get_backtest_results(self, strategy_id: Optional[str] = None) -> pd.DataFrame:
         """
         获取回测结果
-        
+
         Args:
             strategy_id: 策略ID，为空则获取所有
-            
+
         Returns:
             DataFrame包含回测结果
         """
@@ -581,27 +608,27 @@ class DuckDBStorage:
             if strategy_id:
                 df = self._conn.execute(
                     "SELECT * FROM backtest_results WHERE strategy_id = ? ORDER BY created_at DESC",
-                    [strategy_id]
+                    [strategy_id],
                 ).fetchdf()
             else:
                 df = self._conn.execute(
                     "SELECT * FROM backtest_results ORDER BY created_at DESC"
                 ).fetchdf()
-            
+
             return df
-            
+
         except Exception as e:
             logger.error(f"查询回测结果失败: {e}")
             return pd.DataFrame()
-    
+
     def execute_query(self, query: str, params: Optional[List] = None) -> pd.DataFrame:
         """
         执行自定义查询
-        
+
         Args:
             query: SQL查询语句
             params: 查询参数
-            
+
         Returns:
             DataFrame包含查询结果
         """
@@ -610,11 +637,11 @@ class DuckDBStorage:
                 return self._conn.execute(query, params).fetchdf()
             else:
                 return self._conn.execute(query).fetchdf()
-                
+
         except Exception as e:
             logger.error(f"执行查询失败: {e}")
             return pd.DataFrame()
-    
+
     def close(self):
         """关闭数据库连接并释放文件锁"""
         if self._conn:
@@ -629,7 +656,7 @@ class DuckDBStorage:
             self._conn = None
             logger.info("DuckDB连接已关闭")
         self._release_file_lock()
-    
+
     def get_symbol_max_date(self, symbol: str) -> Optional[datetime.date]:
         """
         获取某只股票在数据库中的最新日期
@@ -642,8 +669,7 @@ class DuckDBStorage:
         """
         try:
             result = self._conn.execute(
-                "SELECT MAX(date) FROM stock_daily WHERE symbol = ?",
-                [symbol]
+                "SELECT MAX(date) FROM stock_daily WHERE symbol = ?", [symbol]
             ).fetchone()
             return result[0] if result and result[0] else None
         except Exception as e:
@@ -673,7 +699,7 @@ class DuckDBStorage:
             logger.error(f"获取股票日期范围失败: {e}")
             return pd.DataFrame()
 
-    def save_trade_calendar(self, dates: List[str], exchange: str = 'SSE') -> bool:
+    def save_trade_calendar(self, dates: List[str], exchange: str = "SSE") -> bool:
         """
         保存交易日历
 
@@ -693,7 +719,7 @@ class DuckDBStorage:
             for d in dates:
                 normalized = self._normalize_date(d)
                 if normalized:
-                    df_data.append({'trade_date': normalized, 'exchange': exchange})
+                    df_data.append({"trade_date": normalized, "exchange": exchange})
 
             if not df_data:
                 return False
@@ -713,8 +739,9 @@ class DuckDBStorage:
             logger.error(f"保存交易日历失败: {e}")
             return False
 
-    def get_trade_calendar(self, start_date: Optional[str] = None,
-                           end_date: Optional[str] = None) -> List[str]:
+    def get_trade_calendar(
+        self, start_date: Optional[str] = None, end_date: Optional[str] = None
+    ) -> List[str]:
         """
         查询交易日历
 
@@ -742,16 +769,28 @@ class DuckDBStorage:
             query += " ORDER BY trade_date"
 
             result = self._conn.execute(query, params).fetchall()
-            dates = [row[0].strftime('%Y%m%d') if hasattr(row[0], 'strftime') else str(row[0]).replace('-', '') for row in result]
+            dates = [
+                (
+                    row[0].strftime("%Y%m%d")
+                    if hasattr(row[0], "strftime")
+                    else str(row[0]).replace("-", "")
+                )
+                for row in result
+            ]
             return dates
 
         except Exception as e:
             logger.error(f"查询交易日历失败: {e}")
             return []
 
-    def update_sync_status(self, status: str = 'idle', total_symbols: int = 0,
-                           success_count: int = 0, failed_count: int = 0,
-                           message: str = '') -> bool:
+    def update_sync_status(
+        self,
+        status: str = "idle",
+        total_symbols: int = 0,
+        success_count: int = 0,
+        failed_count: int = 0,
+        message: str = "",
+    ) -> bool:
         """
         更新同步状态
 
@@ -766,11 +805,14 @@ class DuckDBStorage:
             是否成功
         """
         try:
-            self._conn.execute("""
+            self._conn.execute(
+                """
                 INSERT OR REPLACE INTO sync_status (id, last_sync_time, total_symbols,
                     success_count, failed_count, status, message, updated_at)
                 VALUES (1, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """, [total_symbols, success_count, failed_count, status, message])
+            """,
+                [total_symbols, success_count, failed_count, status, message],
+            )
             return True
         except Exception as e:
             logger.error(f"更新同步状态失败: {e}")
@@ -784,12 +826,19 @@ class DuckDBStorage:
             状态字典，如果没有则返回 None
         """
         try:
-            result = self._conn.execute(
-                "SELECT * FROM sync_status WHERE id = 1"
-            ).fetchone()
+            result = self._conn.execute("SELECT * FROM sync_status WHERE id = 1").fetchone()
             if result:
-                columns = ['id', 'last_sync_time', 'total_symbols', 'success_count',
-                           'failed_count', 'status', 'message', 'created_at', 'updated_at']
+                columns = [
+                    "id",
+                    "last_sync_time",
+                    "total_symbols",
+                    "success_count",
+                    "failed_count",
+                    "status",
+                    "message",
+                    "created_at",
+                    "updated_at",
+                ]
                 return dict(zip(columns, result))
             return None
         except Exception as e:
@@ -797,24 +846,26 @@ class DuckDBStorage:
             return None
 
     def save_balance_sheet(self, symbol: str, period: str, data: pd.DataFrame) -> bool:
-        return self._save_financial_table('balance_sheet', symbol, period, data)
+        return self._save_financial_table("balance_sheet", symbol, period, data)
 
     def get_balance_sheet(self, symbol: str, period: Optional[str] = None) -> pd.DataFrame:
-        return self._get_financial_table('balance_sheet', symbol, period)
+        return self._get_financial_table("balance_sheet", symbol, period)
 
     def save_income_statement(self, symbol: str, period: str, data: pd.DataFrame) -> bool:
-        return self._save_financial_table('income_statement', symbol, period, data)
+        return self._save_financial_table("income_statement", symbol, period, data)
 
     def get_income_statement(self, symbol: str, period: Optional[str] = None) -> pd.DataFrame:
-        return self._get_financial_table('income_statement', symbol, period)
+        return self._get_financial_table("income_statement", symbol, period)
 
     def save_cashflow_statement(self, symbol: str, period: str, data: pd.DataFrame) -> bool:
-        return self._save_financial_table('cashflow_statement', symbol, period, data)
+        return self._save_financial_table("cashflow_statement", symbol, period, data)
 
     def get_cashflow_statement(self, symbol: str, period: Optional[str] = None) -> pd.DataFrame:
-        return self._get_financial_table('cashflow_statement', symbol, period)
+        return self._get_financial_table("cashflow_statement", symbol, period)
 
-    def _save_financial_table(self, table: str, symbol: str, period: str, data: pd.DataFrame) -> bool:
+    def _save_financial_table(
+        self, table: str, symbol: str, period: str, data: pd.DataFrame
+    ) -> bool:
         """
         保存财务报表数据（单条记录）。
 
@@ -826,35 +877,68 @@ class DuckDBStorage:
             if data.empty:
                 return False
             df = data.copy()
-            ann_date = df['ann_date'].iloc[0] if 'ann_date' in df.columns else None
-            raw_json = json.dumps(df.to_dict(orient='records'), ensure_ascii=False)
+            ann_date = df["ann_date"].iloc[0] if "ann_date" in df.columns else None
+            raw_json = json.dumps(df.to_dict(orient="records"), ensure_ascii=False)
 
-            if table == 'balance_sheet':
-                total_assets = float(df['total_assets'].iloc[0]) if 'total_assets' in df.columns else None
-                total_liab = float(df['total_liab'].iloc[0]) if 'total_liab' in df.columns else None
-                total_eqy = float(df['total_hldr_eqy_exc_min_int'].iloc[0]) if 'total_hldr_eqy_exc_min_int' in df.columns else None
-                self._conn.execute(f"""
+            if table == "balance_sheet":
+                total_assets = (
+                    float(df["total_assets"].iloc[0]) if "total_assets" in df.columns else None
+                )
+                total_liab = float(df["total_liab"].iloc[0]) if "total_liab" in df.columns else None
+                total_eqy = (
+                    float(df["total_hldr_eqy_exc_min_int"].iloc[0])
+                    if "total_hldr_eqy_exc_min_int" in df.columns
+                    else None
+                )
+                self._conn.execute(
+                    f"""
                     INSERT OR REPLACE INTO {table} (symbol, report_period, ann_date, total_assets, total_liab, total_hldr_eqy_exc_min_int, raw_json, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """, [symbol, period, ann_date, total_assets, total_liab, total_eqy, raw_json])
+                """,
+                    [symbol, period, ann_date, total_assets, total_liab, total_eqy, raw_json],
+                )
 
-            elif table == 'income_statement':
-                revenue = float(df['revenue'].iloc[0]) if 'revenue' in df.columns else None
-                operate_profit = float(df['operate_profit'].iloc[0]) if 'operate_profit' in df.columns else None
-                net_income = float(df['net_income'].iloc[0]) if 'net_income' in df.columns else None
-                self._conn.execute(f"""
+            elif table == "income_statement":
+                revenue = float(df["revenue"].iloc[0]) if "revenue" in df.columns else None
+                operate_profit = (
+                    float(df["operate_profit"].iloc[0]) if "operate_profit" in df.columns else None
+                )
+                net_income = float(df["net_income"].iloc[0]) if "net_income" in df.columns else None
+                self._conn.execute(
+                    f"""
                     INSERT OR REPLACE INTO {table} (symbol, report_period, ann_date, revenue, operate_profit, net_income, raw_json, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """, [symbol, period, ann_date, revenue, operate_profit, net_income, raw_json])
+                """,
+                    [symbol, period, ann_date, revenue, operate_profit, net_income, raw_json],
+                )
 
-            elif table == 'cashflow_statement':
-                n_cashflow_act = float(df['n_cashflow_act'].iloc[0]) if 'n_cashflow_act' in df.columns else None
-                n_cashflow_inv = float(df['n_cashflow_inv_act'].iloc[0]) if 'n_cashflow_inv_act' in df.columns else None
-                f_cashflow = float(df['f_cashflow_act'].iloc[0]) if 'f_cashflow_act' in df.columns else None
-                self._conn.execute(f"""
+            elif table == "cashflow_statement":
+                n_cashflow_act = (
+                    float(df["n_cashflow_act"].iloc[0]) if "n_cashflow_act" in df.columns else None
+                )
+                n_cashflow_inv = (
+                    float(df["n_cashflow_inv_act"].iloc[0])
+                    if "n_cashflow_inv_act" in df.columns
+                    else None
+                )
+                f_cashflow = (
+                    float(df["f_cashflow_act"].iloc[0]) if "f_cashflow_act" in df.columns else None
+                )
+                self._conn.execute(
+                    f"""
                     INSERT OR REPLACE INTO {table} (symbol, report_period, ann_date, n_cashflow_act, n_cashflow_inv_act, f_cashflow_act, raw_json, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """, [symbol, period, ann_date, n_cashflow_act, n_cashflow_inv, f_cashflow, raw_json])
+                """,
+                    [
+                        symbol,
+                        period,
+                        ann_date,
+                        n_cashflow_act,
+                        n_cashflow_inv,
+                        f_cashflow,
+                        raw_json,
+                    ],
+                )
 
             logger.debug(f"保存 {symbol} {table}: {period}")
             return True
@@ -862,7 +946,9 @@ class DuckDBStorage:
             logger.error(f"保存 {symbol} {table} 失败 ({period}): {e}")
             return False
 
-    def _get_financial_table(self, table: str, symbol: str, period: Optional[str] = None) -> pd.DataFrame:
+    def _get_financial_table(
+        self, table: str, symbol: str, period: Optional[str] = None
+    ) -> pd.DataFrame:
         if table not in self._ALLOWED_FINANCIAL_TABLES:
             raise ValueError(f"Invalid financial table: {table}")
         try:
@@ -888,12 +974,14 @@ class DuckDBStorage:
             Dict[str, Set[str]]: {symbol: {period1, period2, ...}}
         """
         try:
-            tables = ['balance_sheet', 'income_statement', 'cashflow_statement']
+            tables = ["balance_sheet", "income_statement", "cashflow_statement"]
             all_periods: Dict[str, Set[str]] = {}
             for table in tables:
                 if table not in self._ALLOWED_FINANCIAL_TABLES:
                     raise ValueError(f"Invalid financial table: {table}")
-                result = self._conn.execute(f"SELECT DISTINCT symbol, report_period FROM {table}").fetchall()
+                result = self._conn.execute(
+                    f"SELECT DISTINCT symbol, report_period FROM {table}"
+                ).fetchall()
                 for symbol, period in result:
                     if symbol not in all_periods:
                         all_periods[symbol] = set()
@@ -903,10 +991,16 @@ class DuckDBStorage:
             logger.error(f"查询已有财务报告期失败: {e}")
             return {}
 
-    def save_research_report(self, report_id: str, report_type: str,
-                             symbols: Optional[List[str]], summary: str,
-                             verdict: str, confidence: float,
-                             report_json: str) -> bool:
+    def save_research_report(
+        self,
+        report_id: str,
+        report_type: str,
+        symbols: Optional[List[str]],
+        summary: str,
+        verdict: str,
+        confidence: float,
+        report_json: str,
+    ) -> bool:
         """
         保存研究报告
 
@@ -923,7 +1017,8 @@ class DuckDBStorage:
             是否成功
         """
         try:
-            self._conn.execute("""
+            self._conn.execute(
+                """
                 INSERT INTO research_reports (report_id, report_type, symbols, summary, verdict, confidence, report_json, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT (report_id) DO UPDATE SET
@@ -934,7 +1029,9 @@ class DuckDBStorage:
                     confidence = EXCLUDED.confidence,
                     report_json = EXCLUDED.report_json,
                     created_at = EXCLUDED.created_at
-            """, [report_id, report_type, symbols, summary, verdict, confidence, report_json])
+            """,
+                [report_id, report_type, symbols, summary, verdict, confidence, report_json],
+            )
             logger.info(f"保存研究报告: {report_id}")
             return True
         except Exception as e:
@@ -953,20 +1050,28 @@ class DuckDBStorage:
         """
         try:
             result = self._conn.execute(
-                "SELECT * FROM research_reports WHERE report_id = ?",
-                [report_id]
+                "SELECT * FROM research_reports WHERE report_id = ?", [report_id]
             ).fetchone()
             if result:
-                columns = ['report_id', 'report_type', 'symbols', 'summary',
-                           'verdict', 'confidence', 'report_json', 'created_at']
+                columns = [
+                    "report_id",
+                    "report_type",
+                    "symbols",
+                    "summary",
+                    "verdict",
+                    "confidence",
+                    "report_json",
+                    "created_at",
+                ]
                 return dict(zip(columns, result))
             return None
         except Exception as e:
             logger.error(f"获取研究报告失败: {e}")
             return None
 
-    def get_research_reports(self, report_type: Optional[str] = None,
-                             limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+    def get_research_reports(
+        self, report_type: Optional[str] = None, limit: int = 100, offset: int = 0
+    ) -> List[Dict[str, Any]]:
         """
         获取研究报告列表
 
@@ -980,21 +1085,35 @@ class DuckDBStorage:
         """
         try:
             if report_type:
-                results = self._conn.execute("""
+                results = self._conn.execute(
+                    """
                     SELECT * FROM research_reports
                     WHERE report_type = ?
                     ORDER BY created_at DESC
                     LIMIT ? OFFSET ?
-                """, [report_type, limit, offset]).fetchall()
+                """,
+                    [report_type, limit, offset],
+                ).fetchall()
             else:
-                results = self._conn.execute("""
+                results = self._conn.execute(
+                    """
                     SELECT * FROM research_reports
                     ORDER BY created_at DESC
                     LIMIT ? OFFSET ?
-                """, [limit, offset]).fetchall()
+                """,
+                    [limit, offset],
+                ).fetchall()
 
-            columns = ['report_id', 'report_type', 'symbols', 'summary',
-                       'verdict', 'confidence', 'report_json', 'created_at']
+            columns = [
+                "report_id",
+                "report_type",
+                "symbols",
+                "summary",
+                "verdict",
+                "confidence",
+                "report_json",
+                "created_at",
+            ]
             return [dict(zip(columns, row)) for row in results]
         except Exception as e:
             logger.error(f"获取研究报告列表失败: {e}")

@@ -13,6 +13,7 @@ NODES=(
     "risk"
     "monitor"
     "system_metrics"
+    "favor"
 )
 
 # 额外服务（非 ROS2 节点但属于系统）
@@ -77,6 +78,9 @@ stop_node_by_name() {
             ;;
         "system_metrics")
             pids=$(pgrep -f "lanbao_monitor\.system_metrics_node")
+            ;;
+        "favor")
+            pids=$(pgrep -f "lanbao_favor\.favor_node")
             ;;
         "backtest_api")
             pids=$(pgrep -f "uvicorn lanbao_backtest\.api\.main:app")

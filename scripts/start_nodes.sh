@@ -28,9 +28,9 @@ mkdir -p logs
 
 # 基础PYTHONPATH (注意: lanbao_interfaces使用python3.11目录但包含python3.10的so文件)
 ROS_PYTHONPATH="/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages"
-LANBAO_INSTALL_PATHS="./install/lanbao_interfaces/lib/python3.10/site-packages:./install/lanbao_core/lib/python3.10/site-packages:./install/lanbao_data/lib/python3.10/site-packages:./install/lanbao_strategy/lib/python3.10/site-packages:./install/lanbao_backtest/lib/python3.10/site-packages:./install/lanbao_risk/lib/python3.10/site-packages:./install/lanbao_monitor/lib/python3.10/site-packages"
+LANBAO_INSTALL_PATHS="./install/lanbao_interfaces/lib/python3.10/site-packages:./install/lanbao_core/lib/python3.10/site-packages:./install/lanbao_data/lib/python3.10/site-packages:./install/lanbao_strategy/lib/python3.10/site-packages:./install/lanbao_backtest/lib/python3.10/site-packages:./install/lanbao_risk/lib/python3.10/site-packages:./install/lanbao_monitor/lib/python3.10/site-packages:./install/lanbao_favor/lib/python3.10/site-packages"
 # build目录包含实际的包代码(.egg-link指向这里)
-LANBAO_BUILD_PATHS="./build/lanbao_interfaces:./build/lanbao_core:./build/lanbao_data:./build/lanbao_strategy:./build/lanbao_backtest:./build/lanbao_risk:./build/lanbao_monitor"
+LANBAO_BUILD_PATHS="./build/lanbao_interfaces:./build/lanbao_core:./build/lanbao_data:./build/lanbao_strategy:./build/lanbao_backtest:./build/lanbao_risk:./build/lanbao_monitor:./build/lanbao_favor"
 
 # 停止已运行的同名节点
 stop_existing() {
@@ -46,6 +46,7 @@ stop_existing() {
         "monitor") pids=$(pgrep -f "lanbao_monitor\.monitor_node") ;;
         "system_metrics") pids=$(pgrep -f "lanbao_monitor\.system_metrics_node") ;;
         "rosbridge_server") pids=$(pgrep -f "rosbridge_websocket_launch") ;;
+        "favor") pids=$(pgrep -f "lanbao_favor\.favor_node") ;;
     esac
 
     if [ -n "$pids" ]; then
@@ -160,6 +161,10 @@ sleep 1
 
 # 8. AI 投研节点
 start_node "ai_research" "lanbao_ai_research" "lanbao_ai_research.ai_research_node"
+sleep 1
+
+# 9. 自选股管理节点
+start_node "favor" "lanbao_favor" "lanbao_favor.favor_node"
 
 echo ""
 echo -e "${GREEN}=======================================${NC}"

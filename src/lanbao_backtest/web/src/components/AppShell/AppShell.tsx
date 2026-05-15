@@ -20,6 +20,7 @@ const pathToModuleMap: Record<string, string> = {
   '/risk-monitor': 'monitor',
   '/data-center': 'data',
   '/system-config': 'settings',
+  '/favor': 'research',
 };
 
 function getModuleFromPath(path: string): string {

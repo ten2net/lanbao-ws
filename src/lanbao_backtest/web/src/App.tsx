@@ -13,6 +13,9 @@ import { SystemConfigPage } from './pages/SystemConfigPage';
 import { AIResearchDailyPage } from './pages/AIResearchDailyPage';
 import { AIResearchStockPage } from './pages/AIResearchStockPage';
 import { AIResearchHistoryPage } from './pages/AIResearchHistoryPage';
+import { FavorWatchlistPage } from './pages/FavorWatchlistPage';
+import { FavorConditionsPage } from './pages/FavorConditionsPage';
+import { FavorPickPage } from './pages/FavorPickPage';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
@@ -36,6 +39,9 @@ export default function App() {
             <Route path="/ai-research/daily" element={<AIResearchDailyPage />} />
             <Route path="/ai-research/stock" element={<AIResearchStockPage />} />
             <Route path="/ai-research/history" element={<AIResearchHistoryPage />} />
+            <Route path="/favor/watchlist" element={<FavorWatchlistPage />} />
+            <Route path="/favor/conditions" element={<FavorConditionsPage />} />
+            <Route path="/favor/pick" element={<FavorPickPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

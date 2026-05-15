@@ -11,6 +11,8 @@ import {
   FileTextOutlined,
   SearchOutlined,
   HistoryOutlined,
+  EyeOutlined,
+  FilterOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { MenuProps } from 'antd';
@@ -27,6 +29,9 @@ const menuConfig: Record<string, MenuProps['items']> = {
     { key: '/ai-research/daily', label: 'AI日报', icon: <FileTextOutlined /> },
     { key: '/ai-research/stock', label: '个股研究', icon: <SearchOutlined /> },
     { key: '/ai-research/history', label: '报告历史', icon: <HistoryOutlined /> },
+    { key: '/favor/watchlist', label: '自选股', icon: <EyeOutlined /> },
+    { key: '/favor/conditions', label: '选股条件', icon: <SettingOutlined /> },
+    { key: '/favor/pick', label: '智能选股', icon: <FilterOutlined /> },
   ],
   monitor: [
     { key: '/system-overview', label: '系统概览', icon: <DashboardOutlined /> },

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { favorApi, FavorCondition, PickRequest } from '../api/favor';
+import { favorApi } from '../api/favor';
 
 const KEY = 'favor';
 

@@ -73,6 +73,7 @@ class DataSyncNode(LanBaoBaseNode):
         # 财务同步运行状态
         self._financial_sync_thread: Optional[threading.Thread] = None
         self._financial_sync_running = False
+        self._financial_sync_lock = threading.Lock()
         self._last_financial_sync_time: Optional[datetime] = None
         self._financial_sync_stats: Dict[str, Any] = {}
 
@@ -204,6 +205,12 @@ class DataSyncNode(LanBaoBaseNode):
             if self._financial_schedule_timer:
                 self.destroy_timer(self._financial_schedule_timer)
 
+            # Destroy subscriptions
+            if hasattr(self, '_sync_trigger_sub') and self._sync_trigger_sub:
+                self.destroy_subscription(self._sync_trigger_sub)
+            if hasattr(self, '_financial_sync_trigger_sub') and self._financial_sync_trigger_sub:
+                self.destroy_subscription(self._financial_sync_trigger_sub)
+
             logger.info("DataSyncNode 已停止")
 
         except Exception as e:
@@ -248,8 +255,12 @@ class DataSyncNode(LanBaoBaseNode):
 
     def _should_sync_financial_today(self) -> bool:
         """判断今天是否需要执行财务同步"""
-        if not self._financial_sync_enabled or self._financial_sync_running:
+        if not self._financial_sync_enabled:
             return False
+
+        with self._financial_sync_lock:
+            if self._financial_sync_running:
+                return False
 
         now = datetime.now()
         current_time = now.strftime('%H:%M')
@@ -288,11 +299,12 @@ class DataSyncNode(LanBaoBaseNode):
 
     def _trigger_financial_sync(self):
         """触发财务同步后台任务"""
-        if self._financial_sync_running:
-            logger.warning("财务同步任务已在运行中，跳过本次触发")
-            return
+        with self._financial_sync_lock:
+            if self._financial_sync_running:
+                logger.warning("财务同步任务已在运行中，跳过本次触发")
+                return
+            self._financial_sync_running = True
 
-        self._financial_sync_running = True
         self._last_financial_sync_time = datetime.now()
 
         self._financial_sync_thread = threading.Thread(
@@ -468,7 +480,8 @@ class DataSyncNode(LanBaoBaseNode):
             if write_storage:
                 write_storage.close()
 
-            self._financial_sync_running = False
+            with self._financial_sync_lock:
+                self._financial_sync_running = False
             self._financial_sync_stats = {
                 'total': total_symbols,
                 'synced': success_count,

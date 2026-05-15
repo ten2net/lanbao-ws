@@ -63,9 +63,11 @@ class TestFinancialSyncLogic:
     @patch('lanbao_data.data_sync_node.LanBaoBaseNode.__init__', return_value=None)
     def test_should_sync_financial_today(self, mock_base_init, mock_adapter_cls):
         """测试周日判断逻辑"""
+        import threading
         node = DataSyncNode.__new__(DataSyncNode)
         node._financial_sync_enabled = True
         node._financial_sync_running = False
+        node._financial_sync_lock = threading.Lock()
         node._financial_sync_day = 'sun'
         node._financial_sync_time = '02:00'
         node._last_financial_sync_time = None
@@ -83,9 +85,11 @@ class TestFinancialSyncLogic:
     @patch('lanbao_data.data_sync_node.LanBaoBaseNode.__init__', return_value=None)
     def test_should_not_sync_wrong_day(self, mock_base_init, mock_adapter_cls):
         """测试非配置日不触发"""
+        import threading
         node = DataSyncNode.__new__(DataSyncNode)
         node._financial_sync_enabled = True
         node._financial_sync_running = False
+        node._financial_sync_lock = threading.Lock()
         node._financial_sync_day = 'sun'
         node._financial_sync_time = '02:00'
         node._last_financial_sync_time = None
@@ -103,8 +107,61 @@ class TestFinancialSyncLogic:
     @patch('lanbao_data.data_sync_node.LanBaoBaseNode.__init__', return_value=None)
     def test_trigger_financial_sync_prevents_duplicate(self, mock_base_init, mock_adapter_cls):
         """测试重复触发被阻止"""
+        import threading
         node = DataSyncNode.__new__(DataSyncNode)
         node._financial_sync_running = True
+        node._financial_sync_lock = threading.Lock()
 
         node._trigger_financial_sync()
         assert node._financial_sync_running  # Still running, not changed
+
+    @patch('lanbao_data.data_sync_node.TushareAdapter')
+    @patch('lanbao_data.data_sync_node.LanBaoBaseNode.__init__', return_value=None)
+    def test_sync_financial_job_resets_running_flag(self, mock_base_init, mock_adapter_cls):
+        """测试同步任务完成后重置 running 标志"""
+        import threading
+        node = DataSyncNode.__new__(DataSyncNode)
+        node._financial_sync_running = True
+        node._financial_sync_lock = threading.Lock()
+        node._financial_sync_stats = {}
+        node._status = Mock()
+
+        # Mock empty stock list (early return path)
+        node._adapter = Mock()
+        node._adapter.get_stock_list.return_value = pd.DataFrame({'symbol': []})
+
+        node._sync_financial_job()
+
+        assert not node._financial_sync_running
+
+    @patch('lanbao_data.data_sync_node.TushareAdapter')
+    @patch('lanbao_data.data_sync_node.LanBaoBaseNode.__init__', return_value=None)
+    def test_partial_statement_failure_handled(self, mock_base_init, mock_adapter_cls):
+        """测试部分报表缺失时标记为失败但不中断"""
+        import threading
+        node = DataSyncNode.__new__(DataSyncNode)
+        node._financial_sync_running = True
+        node._financial_sync_lock = threading.Lock()
+        node._financial_batch_interval = 100
+        node._financial_sync_stats = {}
+        node._status = Mock()
+        node._publish_alert = Mock()
+
+        # Mock adapter to return only 2 of 3 statements
+        node._adapter = Mock()
+        node._adapter.get_stock_list.return_value = pd.DataFrame({'symbol': ['000001.SZ']})
+        node._adapter.get_balance_sheet.return_value = pd.DataFrame({'total_assets': [1.0]})
+        node._adapter.get_income_statement.return_value = pd.DataFrame({'revenue': [1.0]})
+        node._adapter.get_cashflow_statement.return_value = pd.DataFrame()  # empty
+
+        # Mock storage
+        mock_storage = Mock()
+        mock_storage.save_balance_sheet.return_value = True
+        mock_storage.save_income_statement.return_value = True
+        mock_storage.save_cashflow_statement.return_value = False
+
+        with patch('lanbao_data.data_sync_node.DuckDBStorage', return_value=mock_storage):
+            node._sync_financial_job()
+
+        # Should complete without exception, running flag reset
+        assert not node._financial_sync_running

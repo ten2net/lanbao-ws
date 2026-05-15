@@ -25,7 +25,7 @@ class FavorSyncManager:
             return [{'code': s.code, 'name': s.name} for s in stocks]
         except Exception as e:
             logger.error(f"获取自选股失败: {e}")
-            return []
+            raise RuntimeError(f"获取 EastMoney 自选股失败: {e}")
 
     def add_stocks(self, codes: List[str], group_name: str = "自选股") -> bool:
         if not codes:
@@ -34,7 +34,7 @@ class FavorSyncManager:
             return self._api.add_to_watchlist(codes, group_name=group_name)
         except Exception as e:
             logger.error(f"添加自选股失败: {e}")
-            return False
+            raise RuntimeError(f"同步到 EastMoney 失败: {e}")
 
     def remove_stocks(self, codes: List[str], group_name: str = "自选股") -> bool:
         if not codes:
@@ -43,14 +43,14 @@ class FavorSyncManager:
             return self._api.remove_from_watchlist(codes, group_name=group_name)
         except Exception as e:
             logger.error(f"移除自选股失败: {e}")
-            return False
+            raise RuntimeError(f"移除 EastMoney 自选股失败: {e}")
 
     def create_group(self, group_name: str) -> bool:
         try:
             return self._api.create_group(group_name)
         except Exception as e:
             logger.error(f"创建分组失败: {e}")
-            return False
+            raise RuntimeError(f"创建 EastMoney 分组失败: {e}")
 
     def get_groups(self) -> List[Dict]:
         try:
@@ -58,4 +58,4 @@ class FavorSyncManager:
             return [{'id': g.id, 'name': g.name} for g in groups]
         except Exception as e:
             logger.error(f"获取分组失败: {e}")
-            return []
+            raise RuntimeError(f"获取 EastMoney 分组失败: {e}")

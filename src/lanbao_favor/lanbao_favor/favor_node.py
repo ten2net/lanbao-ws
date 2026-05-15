@@ -18,6 +18,7 @@ from .duckdb_storage import FavorStorage
 from .condition_manager import ConditionManager
 from .stock_picker import StockPicker
 from .favor_sync_manager import FavorSyncManager
+from .schedule_manager import ScheduleManager
 from .models import FavorCondition
 
 
@@ -44,6 +45,12 @@ class FavorNode(LanBaoBaseNode):
             except ValueError:
                 logger.warning("EastMoney 凭证未配置，同步功能不可用")
                 self._sync_mgr = None
+
+            self._schedule_mgr = ScheduleManager(
+                self,
+                run_pick_callback=self._run_scheduled_pick,
+                run_cleanup_callback=self._run_cleanup
+            )
 
             self._setup_services()
             self._setup_action_server()
@@ -206,15 +213,26 @@ class FavorNode(LanBaoBaseNode):
         return result
 
     def start(self) -> bool:
+        self._schedule_mgr.start()
         logger.info("FavorNode 启动")
         return True
 
     def stop(self):
+        self._schedule_mgr.stop()
         logger.info("FavorNode 停止")
         if self._storage:
             self._storage.close()
         if self._action_server:
             self._action_server.destroy()
+
+    def _run_scheduled_pick(self, schedule_name: str):
+        logger.info(f"执行定时选股: {schedule_name}")
+        conditions = self._condition_mgr.get_enabled_conditions()
+        self._do_pick(conditions, clear_existing=False)
+
+    def _run_cleanup(self, cleanup_type: str):
+        logger.info(f"执行清理: {cleanup_type}")
+        # TODO: implement cleanup logic (remove low volume stocks)
 
 
 def main(args=None):

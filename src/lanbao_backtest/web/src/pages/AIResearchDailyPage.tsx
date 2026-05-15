@@ -17,9 +17,10 @@ export const AIResearchDailyPage: React.FC = () => {
     try {
       const result = await triggerDaily.mutateAsync(undefined);
       message.success(`已开始生成日报: ${result.report_id}`);
-      navigate(`/ai-research/stock?reportId=${result.report_id}`);
-    } catch (e) {
-      message.error('生成日报失败');
+      navigate(`/ai-research/history?reportId=${result.report_id}`);
+    } catch (e: any) {
+      message.error(`生成日报失败: ${e?.message || String(e)}`);
+      console.error('生成日报失败:', e);
     } finally {
       setGenerating(false);
     }

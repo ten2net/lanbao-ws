@@ -31,7 +31,10 @@ export const AIResearchStockPage: React.FC = () => {
       setActiveReportId(result.report_id);
       setSearchParams({ reportId: result.report_id });
       message.success(`已开始分析: ${symbol}`);
-    } catch (e) { message.error('分析失败'); }
+    } catch (e: any) {
+      message.error(`分析失败: ${e?.message || String(e)}`);
+      console.error('分析失败:', e);
+    }
   };
 
   return (

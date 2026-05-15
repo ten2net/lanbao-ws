@@ -24,17 +24,28 @@ async def trigger_market_daily(request: TriggerDailyRequest):
     """触发市场日报分析"""
     try:
         manager = get_ros2_manager()
+        if not manager.connect():
+            raise HTTPException(status_code=503, detail="ROS2 连接失败，请检查系统是否已启动")
+        if manager.node is None:
+            raise HTTPException(status_code=503, detail="ROS2 节点未初始化")
+
         from lanbao_interfaces.action import RunResearch
 
-        action_client = manager.node.create_client(RunResearch, '/research/run')
-        if not action_client.wait_for_service(timeout_sec=5.0):
+        action_client = manager.get_action_client(RunResearch, '/research/run')
+        if not action_client.wait_for_server(timeout_sec=5.0):
             raise HTTPException(status_code=503, detail="AI Research 服务不可用")
 
         report_id = f"rpt_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
+        # 默认分析沪深300核心成分股，确保有实际数据支撑
+        default_symbols = [
+            "000001", "600519", "000858", "002594",
+            "601012", "600036", "000333", "600900",
+            "601318", "000002",
+        ]
         goal = RunResearch.Goal()
         goal.research_type = "market_daily"
-        goal.symbols = request.symbols or []
+        goal.symbols = request.symbols or default_symbols
         goal.report_id = report_id
 
         future = action_client.send_goal_async(goal)
@@ -49,48 +60,64 @@ async def trigger_market_daily(request: TriggerDailyRequest):
 
 @router.get("/research/status/{report_id}")
 async def get_research_status(report_id: str):
-    """获取分析进度"""
+    """获取分析进度 — 通过检查报告文件是否存在判断状态"""
+    from pathlib import Path
+
+    reports_dir = Path("./reports")
+    if reports_dir.exists():
+        for date_dir in reports_dir.iterdir():
+            if date_dir.is_dir():
+                report_file = date_dir / f"{report_id}.md"
+                if report_file.exists():
+                    return {
+                        "report_id": report_id,
+                        "status": "completed",
+                        "progress": 1.0,
+                        "message": "分析完成",
+                    }
+
     return {
         "report_id": report_id,
         "status": "running",
         "progress": 0.5,
-        "message": "分析进行中..."
+        "message": "分析进行中...",
     }
 
 
 @router.get("/research/report/{report_id}")
 async def get_research_report(report_id: str):
-    """获取完整报告"""
-    try:
-        manager = get_ros2_manager()
-        from lanbao_interfaces.srv import GetResearchReport
+    """获取完整报告 — 直接读取本地文件，绕过 ROS2 Service 避免超时"""
+    from pathlib import Path
+    import json
 
-        client = manager.node.create_client(GetResearchReport, '/research/get_report')
-        if not client.wait_for_service(timeout_sec=5.0):
-            raise HTTPException(status_code=503, detail="服务不可用")
+    reports_dir = Path("./reports")
+    if reports_dir.exists():
+        for date_dir in reports_dir.iterdir():
+            if date_dir.is_dir():
+                # 优先读取 JSON
+                json_file = date_dir / f"{report_id}.json"
+                if json_file.exists():
+                    return json.loads(json_file.read_text(encoding='utf-8'))
+                # 回退到 markdown
+                md_file = date_dir / f"{report_id}.md"
+                if md_file.exists():
+                    markdown = md_file.read_text(encoding='utf-8')
+                    return {
+                        "report_id": report_id,
+                        "report_type": "market_daily",
+                        "created_at": "",
+                        "summary": {
+                            "market_trend": markdown[:2000],
+                            "overall_verdict": "HOLD",
+                            "confidence": 0.5,
+                            "top_sectors": [],
+                            "risk_level": "中"
+                        },
+                        "stock_analyses": [],
+                        "portfolio_suggestions": {}
+                    }
 
-        request = GetResearchReport.Request()
-        request.report_id = report_id
-
-        future = client.call_async(request)
-        import rclpy
-        rclpy.spin_until_future_complete(manager.node, future, timeout_sec=10.0)
-
-        if not future.done():
-            raise HTTPException(status_code=504, detail="查询超时")
-
-        response = future.result()
-        if not response.found:
-            raise HTTPException(status_code=404, detail="报告不存在")
-
-        import json
-        report_data = json.loads(response.report_json)
-        return report_data
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"获取报告失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    raise HTTPException(status_code=404, detail="报告不存在")
 
 
 @router.post("/research/stock")
@@ -98,10 +125,15 @@ async def trigger_stock_research(request: TriggerStockRequest):
     """触发个股深度分析"""
     try:
         manager = get_ros2_manager()
+        if not manager.connect():
+            raise HTTPException(status_code=503, detail="ROS2 连接失败，请检查系统是否已启动")
+        if manager.node is None:
+            raise HTTPException(status_code=503, detail="ROS2 节点未初始化")
+
         from lanbao_interfaces.action import RunResearch
 
-        action_client = manager.node.create_client(RunResearch, '/research/run')
-        if not action_client.wait_for_service(timeout_sec=5.0):
+        action_client = manager.get_action_client(RunResearch, '/research/run')
+        if not action_client.wait_for_server(timeout_sec=5.0):
             raise HTTPException(status_code=503, detail="AI Research 服务不可用")
 
         report_id = f"rpt_{request.symbol}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"

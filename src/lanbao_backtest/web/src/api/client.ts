@@ -12,8 +12,10 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response) {
-      const data = error.response.data as { error?: { message: string } };
-      const message = data?.error?.message || `请求失败: ${error.response.status}`;
+      const data = error.response.data as any;
+      // FastAPI HTTPException 返回 { detail: string }
+      // 其他错误可能返回 { error: { message: string } }
+      const message = data?.detail || data?.error?.message || `请求失败: ${error.response.status}`;
       return Promise.reject(new Error(message));
     }
     if (error.request) {

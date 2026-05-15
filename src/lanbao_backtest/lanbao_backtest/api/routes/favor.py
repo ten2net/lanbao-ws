@@ -369,7 +369,7 @@ async def sync_to_eastmoney(group_name: str = Query("自选股")):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/favor/conditions", response_model=List[FavorConditionResponse])
+@router.get("/favor/conditions")
 async def list_conditions(enabled_only: bool = Query(False)):
     """获取选股条件列表"""
     try:
@@ -392,22 +392,24 @@ async def list_conditions(enabled_only: bool = Query(False)):
         if enabled_only:
             conditions = [c for c in conditions if c.get("enabled", True)]
 
-        return [
-            FavorConditionResponse(
-                id=c.get("id", 0),
-                name=c["name"],
-                query=c["query"],
-                description=c.get("description", ""),
-                enabled=c.get("enabled", True),
-                priority=c.get("priority", 0),
-                max_results=c.get("max_results", 15),
-                filter_hot_sector=c.get("filter_hot_sector", False),
-                filter_min_cap_yi=c.get("filter_min_cap_yi"),
-                created_at=str(c.get("created_at", "")) if c.get("created_at") else None,
-                updated_at=str(c.get("updated_at", "")) if c.get("updated_at") else None,
-            )
-            for c in conditions
-        ]
+        return {
+            "conditions": [
+                {
+                    "id": c.get("id", 0),
+                    "name": c["name"],
+                    "query": c["query"],
+                    "description": c.get("description", ""),
+                    "enabled": c.get("enabled", True),
+                    "priority": c.get("priority", 0),
+                    "max_results": c.get("max_results", 15),
+                    "filter_hot_sector": c.get("filter_hot_sector", False),
+                    "filter_min_cap_yi": c.get("filter_min_cap_yi"),
+                    "created_at": str(c.get("created_at", "")) if c.get("created_at") else None,
+                    "updated_at": str(c.get("updated_at", "")) if c.get("updated_at") else None,
+                }
+                for c in conditions
+            ]
+        }
     except HTTPException:
         raise
     except TimeoutError as e:

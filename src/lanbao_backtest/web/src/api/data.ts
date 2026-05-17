@@ -1,6 +1,21 @@
 import { apiClient } from './client';
 import type { DataSummary, DataTableInfo, SyncTask, QualityReport, TablePreview } from '../types/data';
 
+export interface KLineItem {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface KLineResponse {
+  symbol: string;
+  count: number;
+  data: KLineItem[];
+}
+
 export const dataApi = {
   summary: async () => {
     const { data } = await apiClient.get<DataSummary>('/data/summary');
@@ -31,6 +46,13 @@ export const dataApi = {
 
   preview: async (tableName: string) => {
     const { data } = await apiClient.get<TablePreview>(`/data/preview/${encodeURIComponent(tableName)}`);
+    return data;
+  },
+
+  getKLine: async (symbol: string, days: number = 30) => {
+    const { data } = await apiClient.get<KLineResponse>(`/market/kline/${encodeURIComponent(symbol)}`, {
+      params: { days },
+    });
     return data;
   },
 };

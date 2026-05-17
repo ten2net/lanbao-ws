@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Card, Table, Button, Tabs, Typography, Space, Tag, message, Popconfirm, Select, Alert, Spin } from 'antd';
+import { Card, Table, Button, Tabs, Typography, Space, Tag, message, Popconfirm, Select, Alert, Spin, Popover } from 'antd';
 import { EyeOutlined, DeleteOutlined, SyncOutlined, CloudOutlined } from '@ant-design/icons';
-import { useWatchlist, useRemoveFromWatchlist, useEastMoneyWatchlist, useEastMoneyGroups, useSyncToEastMoney } from '../hooks/useFavor';
+import { useWatchlist, useRemoveFromWatchlist, useEastMoneyWatchlist, useEastMoneyGroups, useSyncToEastMoney, useKLineData } from '../hooks/useFavor';
+import { KLineChart } from '../components/Charts/KLineChart';
 
 const { Title } = Typography;
 
@@ -10,6 +11,55 @@ const LOCAL_GROUPS = [
   { key: '揽宝', label: '揽宝' },
   { key: '短线', label: '短线' },
 ];
+
+/** K线悬浮预览组件 */
+const StockKLinePopover: React.FC<{ symbol: string; children: React.ReactNode }> = ({ symbol, children }) => {
+  const [open, setOpen] = useState(false);
+  const { data: klineData, isLoading } = useKLineData(open ? symbol : undefined, 30);
+
+  const content = (
+    <div style={{ width: 360 }}>
+      <div style={{ fontWeight: 'bold', marginBottom: 8, fontSize: 14 }}>
+        {symbol} 近30日K线
+      </div>
+      {isLoading ? (
+        <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Spin size="small" />
+        </div>
+      ) : klineData && klineData.data.length > 0 ? (
+        <KLineChart
+          data={klineData.data.map((d) => ({
+            time: d.time,
+            open: d.open,
+            high: d.high,
+            low: d.low,
+            close: d.close,
+          }))}
+          height={240}
+        />
+      ) : (
+        <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
+          暂无K线数据
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <Popover
+      content={content}
+      title={null}
+      open={open}
+      onOpenChange={setOpen}
+      trigger="hover"
+      placement="right"
+      mouseEnterDelay={0.3}
+      mouseLeaveDelay={0.1}
+    >
+      {children}
+    </Popover>
+  );
+};
 
 export const FavorWatchlistPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('local');
@@ -43,7 +93,16 @@ export const FavorWatchlistPage: React.FC = () => {
   };
 
   const localColumns = [
-    { title: '代码', dataIndex: 'code', key: 'code' },
+    {
+      title: '代码',
+      dataIndex: 'code',
+      key: 'code',
+      render: (code: string) => (
+        <StockKLinePopover symbol={code}>
+          <span style={{ cursor: 'pointer', color: '#1677ff', fontWeight: 500 }}>{code}</span>
+        </StockKLinePopover>
+      ),
+    },
     { title: '名称', dataIndex: 'name', key: 'name' },
     { title: '来源', dataIndex: 'source_condition', key: 'source_condition' },
     {
@@ -77,7 +136,17 @@ export const FavorWatchlistPage: React.FC = () => {
   ];
 
   const emColumns = [
-    { title: '代码', dataIndex: 'code', key: 'code', width: 90 },
+    {
+      title: '代码',
+      dataIndex: 'code',
+      key: 'code',
+      width: 90,
+      render: (code: string) => (
+        <StockKLinePopover symbol={code}>
+          <span style={{ cursor: 'pointer', color: '#1677ff', fontWeight: 500 }}>{code}</span>
+        </StockKLinePopover>
+      ),
+    },
     { title: '名称', dataIndex: 'name', key: 'name', width: 120 },
     {
       title: '最新价',

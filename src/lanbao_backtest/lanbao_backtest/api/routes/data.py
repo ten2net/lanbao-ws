@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Path, Query
+from fastapi import APIRouter, Path, Query, HTTPException
 from loguru import logger
 
 from lanbao_interfaces.srv import GetDataStats, GetDataQuality, GetSyncStatus, GetDataTables, GetTablePreview
@@ -322,3 +322,49 @@ async def preview_table(
     return TablePreviewResponse(
         table=table_name, columns=[], rows=[], total=0, limit=limit
     )
+
+
+@router.get("/market/kline/{symbol}")
+async def get_kline(
+    symbol: str = Path(..., description="股票代码，如 000001.SZ"),
+    days: int = Query(30, ge=5, le=365, description="获取最近 N 天的数据"),
+):
+    """获取股票日K线数据（通过 ROS2 Service 调用 market_data_node）"""
+    try:
+        from lanbao_interfaces.srv import GetMarketData
+        from datetime import datetime, timedelta
+
+        end_date = datetime.now().strftime("%Y%m%d")
+        start_date = (datetime.now() - timedelta(days=days * 2)).strftime("%Y%m%d")
+
+        req = GetMarketData.Request()
+        req.symbol = symbol
+        req.start_date = start_date
+        req.end_date = end_date
+
+        response = _call_service(GetMarketData, "market_data/get", req, timeout_sec=15.0)
+
+        if not response.success:
+            raise HTTPException(status_code=404, detail=response.message or "未找到数据")
+
+        kline_data = []
+        for msg in response.data:
+            kline_data.append({
+                "time": datetime.fromtimestamp(msg.timestamp / 1000).strftime("%Y-%m-%d"),
+                "open": round(msg.open, 2),
+                "high": round(msg.high, 2),
+                "low": round(msg.low, 2),
+                "close": round(msg.close, 2),
+                "volume": int(msg.volume),
+            })
+
+        return {
+            "symbol": symbol,
+            "count": len(kline_data),
+            "data": kline_data,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取K线数据失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取K线数据失败: {e}")

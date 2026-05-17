@@ -1,8 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { message } from 'antd';
 import { favorApi } from '../api/favor';
+import { dataApi } from '../api/data';
 
 const KEY = 'favor';
+const MARKET_KEY = 'market';
 
 export function useWatchlist(account_id?: string, group_name?: string) {
   return useQuery({
@@ -96,5 +98,17 @@ export function useDeleteCondition() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [KEY, 'conditions'] });
     },
+  });
+}
+
+export function useKLineData(symbol: string | undefined, days: number = 30) {
+  return useQuery({
+    queryKey: [MARKET_KEY, 'kline', symbol, days],
+    queryFn: () => {
+      if (!symbol) return Promise.reject(new Error('股票代码不能为空'));
+      return dataApi.getKLine(symbol, days);
+    },
+    enabled: !!symbol,
+    staleTime: 5 * 60 * 1000, // 5分钟缓存
   });
 }

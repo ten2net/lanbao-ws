@@ -529,7 +529,15 @@ class MarketDataNode(DataProcessorNode):
                 msg.volume = float(row['volume'])
                 msg.amount = float(row.get('amount', 0))
                 msg.data_source = row.get('data_source', 'unknown')
-                msg.timestamp = int(row['date'].timestamp() * 1000) if hasattr(row['date'], 'timestamp') else 0
+                # datetime.date 没有 timestamp() 方法，需要转换为 datetime.datetime
+                date_val = row['date']
+                if hasattr(date_val, 'timestamp'):
+                    msg.timestamp = int(date_val.timestamp() * 1000)
+                elif hasattr(date_val, 'year'):
+                    # datetime.date 对象
+                    msg.timestamp = int(datetime.combine(date_val, datetime.min.time()).timestamp() * 1000)
+                else:
+                    msg.timestamp = 0
                 response.data.append(msg)
 
             response.success = True

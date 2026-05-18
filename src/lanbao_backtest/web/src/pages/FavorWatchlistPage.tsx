@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, Table, Button, Tabs, Typography, Space, Tag, message, Popconfirm, Select, Alert, Spin, Popover } from 'antd';
 import { EyeOutlined, DeleteOutlined, SyncOutlined, CloudOutlined } from '@ant-design/icons';
 import { useWatchlist, useRemoveFromWatchlist, useEastMoneyWatchlist, useEastMoneyGroups, useSyncToEastMoney, useKLineData } from '../hooks/useFavor';
-import { KLineChart } from '../components/Charts/KLineChart';
+import { StockMiniChart } from '../components/Charts/StockMiniChart';
 
 const { Title } = Typography;
 
@@ -13,33 +13,38 @@ const LOCAL_GROUPS = [
 ];
 
 /** K线悬浮预览组件 */
-const StockKLinePopover: React.FC<{ symbol: string; children: React.ReactNode }> = ({ symbol, children }) => {
+const StockKLinePopover: React.FC<{ symbol: string; name?: string; children: React.ReactNode }> = ({ symbol, name, children }) => {
   const [open, setOpen] = useState(false);
-  const { data: klineData, isLoading } = useKLineData(open ? symbol : undefined, 30);
+  const { data: klineData, isLoading, refetch } = useKLineData(open ? symbol : undefined, 30);
+
+  const titleText = name ? `${name} (${symbol})` : symbol;
 
   const content = (
-    <div style={{ width: 360 }}>
-      <div style={{ fontWeight: 'bold', marginBottom: 8, fontSize: 14 }}>
-        {symbol} 近30日K线
+    <div style={{ width: 380 }}>
+      <div style={{ fontWeight: 'bold', marginBottom: 8, fontSize: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>{titleText} 近30日K线</span>
+        <span style={{ fontSize: 12, fontWeight: 'normal', color: '#666' }}>
+          {klineData?.has_today ? (
+            <span style={{ color: '#52c41a' }}>● 含今日</span>
+          ) : klineData ? (
+            <span style={{ color: '#faad14' }}>● 无今日</span>
+          ) : null}
+        </span>
       </div>
       {isLoading ? (
-        <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Spin size="small" />
         </div>
       ) : klineData && klineData.data.length > 0 ? (
-        <KLineChart
-          data={klineData.data.map((d) => ({
-            time: d.time,
-            open: d.open,
-            high: d.high,
-            low: d.low,
-            close: d.close,
-          }))}
-          height={240}
-        />
+        <StockMiniChart data={klineData.data} width={380} />
       ) : (
-        <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
+        <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
           暂无K线数据
+        </div>
+      )}
+      {klineData?.today_debug && (
+        <div style={{ marginTop: 8, padding: '4px 8px', background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 4, fontSize: 12, color: '#cf1322' }}>
+          <strong>调试:</strong> {klineData.today_debug}
         </div>
       )}
     </div>
@@ -50,7 +55,10 @@ const StockKLinePopover: React.FC<{ symbol: string; children: React.ReactNode }>
       content={content}
       title={null}
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={(visible) => {
+        setOpen(visible);
+        if (visible) refetch();
+      }}
       trigger="hover"
       placement="right"
       mouseEnterDelay={0.3}
@@ -97,8 +105,8 @@ export const FavorWatchlistPage: React.FC = () => {
       title: '代码',
       dataIndex: 'code',
       key: 'code',
-      render: (code: string) => (
-        <StockKLinePopover symbol={code}>
+      render: (code: string, record: any) => (
+        <StockKLinePopover symbol={code} name={record.name}>
           <span style={{ cursor: 'pointer', color: '#1677ff', fontWeight: 500 }}>{code}</span>
         </StockKLinePopover>
       ),
@@ -141,8 +149,8 @@ export const FavorWatchlistPage: React.FC = () => {
       dataIndex: 'code',
       key: 'code',
       width: 90,
-      render: (code: string) => (
-        <StockKLinePopover symbol={code}>
+      render: (code: string, record: any) => (
+        <StockKLinePopover symbol={code} name={record.name}>
           <span style={{ cursor: 'pointer', color: '#1677ff', fontWeight: 500 }}>{code}</span>
         </StockKLinePopover>
       ),

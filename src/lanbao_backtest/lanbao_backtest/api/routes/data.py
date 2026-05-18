@@ -324,15 +324,101 @@ async def preview_table(
     )
 
 
+def _to_tx_code(code: str) -> str:
+    """将股票代码转换为腾讯财经格式，支持带后缀格式如 000001.SZ"""
+    if not code:
+        return ""
+    # 去除可能的后缀
+    pure_code = code.split(".")[0].split("-")[0].strip()
+    prefix = pure_code[:3]
+    if prefix in ("600", "601", "603", "605", "688"):
+        return f"sh{pure_code}"
+    elif prefix in ("000", "001", "002", "003", "300", "301"):
+        return f"sz{pure_code}"
+    elif prefix in ("430",) or pure_code[0] in ("8", "9"):
+        return f"bj{pure_code}"
+    else:
+        return f"sh{pure_code}"
+
+
+def _fetch_today_kline(symbol: str) -> tuple[dict | None, str]:
+    """调用腾讯财经 API 获取今日实时行情并合成K线数据
+
+    Returns:
+        (kline_data, debug_msg): K线数据和调试信息
+    """
+    import requests
+    from datetime import datetime
+
+    tx_code = _to_tx_code(symbol)
+    url = f"https://qt.gtimg.cn/q={tx_code}"
+
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.encoding = "GBK"
+        text = resp.text.strip()
+
+        if not text:
+            return None, f"腾讯API返回空内容 ({url})"
+
+        for line in text.split(";"):
+            line = line.strip()
+            if not line.startswith("v_"):
+                continue
+
+            try:
+                prefix, data = line.split('="', 1)
+                data = data.rstrip('"')
+                fields = data.split("~")
+
+                if len(fields) < 35:
+                    return None, f"腾讯API字段不足: {len(fields)} < 35"
+
+                open_price = float(fields[5]) if fields[5] else 0.0
+                high = float(fields[33]) if len(fields) > 33 and fields[33] else 0.0
+                low = float(fields[34]) if len(fields) > 34 and fields[34] else 0.0
+                close = float(fields[3]) if fields[3] else 0.0
+                volume = int(float(fields[6])) if fields[6] else 0
+
+                if close <= 0 or open_price <= 0:
+                    return None, f"数据无效: close={close}, open={open_price} (停牌或未开盘)"
+
+                today = datetime.now().strftime("%Y-%m-%d")
+                result = {
+                    "time": today,
+                    "open": round(open_price, 2),
+                    "high": round(high, 2),
+                    "low": round(low, 2),
+                    "close": round(close, 2),
+                    "volume": volume,
+                }
+                return result, "success"
+            except (ValueError, IndexError) as e:
+                return None, f"解析异常: {e}"
+
+        return None, f"未找到 v_ 开头的数据行"
+    except requests.exceptions.Timeout:
+        return None, f"请求超时 ({url})"
+    except requests.exceptions.ConnectionError as e:
+        return None, f"连接失败: {e}"
+    except Exception as e:
+        return None, f"异常: {type(e).__name__}: {e}"
+
+
 @router.get("/market/kline/{symbol}")
 async def get_kline(
     symbol: str = Path(..., description="股票代码，如 000001.SZ"),
     days: int = Query(30, ge=5, le=365, description="获取最近 N 天的数据"),
 ):
-    """获取股票日K线数据（通过 ROS2 Service 调用 market_data_node）"""
+    """获取股票日K线数据（通过 ROS2 Service 调用 market_data_node），含今日实时数据"""
+    from datetime import datetime, timedelta
+
+    kline_data = []
+    ros2_success = False
+
+    # 1. 尝试从 ROS2 Service 获取历史数据
     try:
         from lanbao_interfaces.srv import GetMarketData
-        from datetime import datetime, timedelta
 
         end_date = datetime.now().strftime("%Y%m%d")
         start_date = (datetime.now() - timedelta(days=days * 2)).strftime("%Y%m%d")
@@ -344,27 +430,60 @@ async def get_kline(
 
         response = _call_service(GetMarketData, "market_data/get", req, timeout_sec=15.0)
 
-        if not response.success:
-            raise HTTPException(status_code=404, detail=response.message or "未找到数据")
-
-        kline_data = []
-        for msg in response.data:
-            kline_data.append({
-                "time": datetime.fromtimestamp(msg.timestamp / 1000).strftime("%Y-%m-%d"),
-                "open": round(msg.open, 2),
-                "high": round(msg.high, 2),
-                "low": round(msg.low, 2),
-                "close": round(msg.close, 2),
-                "volume": int(msg.volume),
-            })
-
-        return {
-            "symbol": symbol,
-            "count": len(kline_data),
-            "data": kline_data,
-        }
-    except HTTPException:
-        raise
+        if response.success:
+            for msg in response.data:
+                kline_data.append({
+                    "time": datetime.fromtimestamp(msg.timestamp / 1000).strftime("%Y-%m-%d"),
+                    "open": round(msg.open, 2),
+                    "high": round(msg.high, 2),
+                    "low": round(msg.low, 2),
+                    "close": round(msg.close, 2),
+                    "volume": int(msg.volume),
+                })
+            ros2_success = True
+            logger.info(f"ROS2 返回 {symbol} 历史数据 {len(kline_data)} 条")
+        else:
+            logger.warning(f"ROS2 查询 {symbol} 无数据: {response.message}")
     except Exception as e:
-        logger.error(f"获取K线数据失败: {e}")
-        raise HTTPException(status_code=500, detail=f"获取K线数据失败: {e}")
+        logger.warning(f"ROS2 查询 {symbol} 失败: {e}")
+
+    # 2. 获取今日实时数据（无论 ROS2 是否成功）
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    today_kline, today_debug = _fetch_today_kline(symbol)
+
+    if today_kline:
+        if kline_data and kline_data[-1]["time"] == today_str:
+            kline_data[-1] = today_kline
+            logger.info(f"已替换 {symbol} 今日K线为实时数据")
+        else:
+            kline_data.append(today_kline)
+            logger.info(f"已追加 {symbol} 今日实时K线数据")
+    else:
+        logger.warning(f"{symbol} 今日实时数据不可用: {today_debug}")
+
+    # 3. 返回结果（至少包含今日数据）
+    if not kline_data:
+        raise HTTPException(status_code=404, detail=f"未找到 {symbol} 的数据（历史数据获取失败且今日数据不可用）")
+
+    return {
+        "symbol": symbol,
+        "count": len(kline_data),
+        "data": kline_data,
+        "has_history": ros2_success,
+        "has_today": today_kline is not None,
+        "today_debug": today_debug,
+    }
+
+
+@router.get("/market/test-tx/{symbol}")
+async def test_tencent_api(symbol: str = Path(..., description="股票代码")):
+    """测试腾讯财经 API 连通性"""
+    today_kline, debug = _fetch_today_kline(symbol)
+    return {
+        "symbol": symbol,
+        "tx_code": _to_tx_code(symbol),
+        "success": today_kline is not None,
+        "data": today_kline,
+        "debug": debug,
+        "server_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }

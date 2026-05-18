@@ -34,6 +34,12 @@ fi
 # 创建日志目录
 mkdir -p logs
 
+# 清除 Python 缓存，确保源码修改生效
+echo -e "${BLUE}清除 Python 缓存...${NC}"
+find "./build" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+find "./src" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+echo -e "${GREEN}✓ Python 缓存已清除${NC}"
+
 # 基础PYTHONPATH (注意: lanbao_interfaces使用python3.11目录但包含python3.10的so文件)
 ROS_PYTHONPATH="/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages"
 LANBAO_INSTALL_PATHS="./install/lanbao_interfaces/lib/python3.10/site-packages:./install/lanbao_core/lib/python3.10/site-packages:./install/lanbao_data/lib/python3.10/site-packages:./install/lanbao_strategy/lib/python3.10/site-packages:./install/lanbao_backtest/lib/python3.10/site-packages:./install/lanbao_risk/lib/python3.10/site-packages:./install/lanbao_monitor/lib/python3.10/site-packages:./install/lanbao_favor/lib/python3.10/site-packages"

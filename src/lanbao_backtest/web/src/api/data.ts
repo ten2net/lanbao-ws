@@ -14,6 +14,9 @@ export interface KLineResponse {
   symbol: string;
   count: number;
   data: KLineItem[];
+  has_history: boolean;
+  has_today: boolean;
+  today_debug?: string;
 }
 
 export const dataApi = {
